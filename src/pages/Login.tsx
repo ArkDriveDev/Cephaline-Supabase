@@ -105,7 +105,7 @@ import {
   
       setShowToast(true);
       setTimeout(() => {
-        navigation.push('/it35-lab/app', 'forward', 'replace');
+        navigation.push('/cephaline-supabase/app', 'forward', 'replace');
       }, 300);
     };
   
