@@ -160,19 +160,6 @@ const Register: React.FC = () => {
     <IonPage>
       <IonContent className='ion-padding'>
 
-        <img
-          src={background}
-          alt="background"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%', 
-            height: '100%', 
-            objectFit: 'cover', 
-            zIndex: -1, 
-          }}
-        />
 
         <div className="glow-wrapper">
           <IonCard
