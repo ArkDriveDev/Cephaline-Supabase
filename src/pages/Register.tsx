@@ -17,7 +17,7 @@ import {
 } from '@ionic/react';
 import { supabase } from '../utils/supaBaseClient';
 import bcrypt from 'bcryptjs';
-import background from '../images/nodes.gif';
+
 
 // Reusable Alert Component
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({ message, isOpen, onClose }) => {

@@ -15,9 +15,7 @@ import {
   } from '@ionic/react';
   import { useState, useEffect } from 'react';
   import { supabase } from '../utils/supaBaseClient';
-  import backgroundImg from '../images/Intro-HELLO-FUTURE-1920x1080_v2.gif';
-  import Logo from '../images/water.gif';
-  import BGM from '../bgm/Warframe 1999 OST_ Cut Through.mp3';
+ 
   
   const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({ message, isOpen, onClose }) => {
     return (
