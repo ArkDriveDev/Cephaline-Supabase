@@ -72,7 +72,7 @@ import {
       document.head.appendChild(style);
     }, []);
   
-    const [audio] = useState(new Audio(BGM));
+    const [audio] = useState(new Audio());
   
     useEffect(() => {
       audio.loop = true;
@@ -117,19 +117,7 @@ import {
           </IonToolbar>
         </IonHeader>
         <IonContent className='ion-padding'>
-          <img
-            src={backgroundImg}
-            alt="background"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              zIndex: -1,
-            }}
-          />
+
           <div
             style={{
               display: 'flex',
@@ -167,18 +155,6 @@ import {
                   }}
                 >
   
-                  <img
-                    src={Logo}
-                    alt="Logo"
-                    style={{
-                      width: '100px',
-                      height: '100px',
-                      objectFit: 'contain',
-                      margin: '0 auto',
-                      display: 'block',
-                      marginBottom: '1rem',
-                    }}
-                  />
   
                   <h1 style={h1Style}>USER LOGIN</h1>
                   <IonInput
