@@ -229,7 +229,7 @@ const Register: React.FC = () => {
               <IonButton onClick={handleOpenVerificationModal} expand="full" shape='round' style={{ marginTop: '15px' }} color="secondary">
                 Register
               </IonButton>
-              <IonButton routerLink="/it35-lab" expand="full" fill="clear" shape='round' color="secondary">
+              <IonButton routerLink="/cephaline-supabase" expand="full" fill="clear" shape='round' color="secondary">
                 Already have an account? Sign in
               </IonButton>
 
@@ -266,7 +266,7 @@ const Register: React.FC = () => {
                     <p>Your account has been created successfully.</p>
                     <p>Please check your email address.</p>
                   </IonText>
-                  <IonButton routerLink="/it35-lab" routerDirection="back" color="primary">
+                  <IonButton routerLink="/cephaline-supabase" routerDirection="back" color="primary">
                     Go to Login
                   </IonButton>
                 </IonContent>
