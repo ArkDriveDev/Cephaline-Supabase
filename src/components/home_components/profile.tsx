@@ -8,7 +8,7 @@ import {
   IonIcon 
 } from '@ionic/react';
 import { pencil } from 'ionicons/icons';
-import { supabase } from '../utils/supaBaseClient';
+import { supabase } from '../../utils/supaBaseClient';
 
 const Profile: React.FC = () => {
   const [name, setName] = useState<string>('Loading...');
