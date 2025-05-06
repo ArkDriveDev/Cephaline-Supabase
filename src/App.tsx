@@ -33,7 +33,7 @@ import '@ionic/react/css/palettes/dark.system.css';
 import './theme/variables.css';
 import Login from './pages/Login';
 import Registration from './pages/Register';
-import Home from './pages/Home';
+import Menu from './pages/Menu';
 
 setupIonicReact();
 
@@ -43,7 +43,7 @@ const App: React.FC = () => (
       <IonRouterOutlet>
         <Route exact path="/cephaline-supabase" component={Login} />
         <Route exact path="/cephaline-supabase/registration" component={Registration} />
-        <Route path="/cephaline-supabase/app" component={Home}/>
+        <Route path="/cephaline-supabase/app" component={Menu} />
       </IonRouterOutlet>
       
     </IonReactRouter>
