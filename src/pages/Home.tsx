@@ -1,8 +1,8 @@
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
-import Profile from '../components/profile';
-import Searchbar from '../components/SearchBar';
-import NewButton from '../components/NewButton';
-import JournalCards from '../components/JournalCards';
+import Profile from '../components/home_components/profile';
+import Searchbar from '../components/home_components/SearchBar';
+import NewButton from '../components/home_components/NewButton';
+import JournalCards from '../components/home_components/JournalCards';
 const Home: React.FC = () => {
     return (
         <IonPage>
