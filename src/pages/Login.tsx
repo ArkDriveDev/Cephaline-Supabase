@@ -193,7 +193,7 @@ import {
                   Login
                 </IonButton>
   
-                <IonButton routerLink="/it35-lab/Registration" expand="full" fill="clear" shape="round" color="secondary">
+                <IonButton routerLink="/cephaline-supabase/Registration" expand="full" fill="clear" shape="round" color="secondary">
                   Don't have an account? Register here
                 </IonButton>
   

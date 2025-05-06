@@ -10,6 +10,7 @@ export default defineConfig({
     react(),
     legacy()
   ],
+  base:"cephaline-supabase",
   test: {
     globals: true,
     environment: 'jsdom',
