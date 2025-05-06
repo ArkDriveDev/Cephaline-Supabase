@@ -2,6 +2,7 @@ import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/rea
 import Profile from '../components/profile';
 import Searchbar from '../components/SearchBar';
 import NewButton from '../components/NewButton';
+import JournalCards from '../components/JournalCards';
 const Home: React.FC = () => {
     return (
         <IonPage>
@@ -16,6 +17,7 @@ const Home: React.FC = () => {
                     <Searchbar />
                     <NewButton/>
                 </div>
+                <JournalCards/>
             </IonContent>
         </IonPage>
     );
