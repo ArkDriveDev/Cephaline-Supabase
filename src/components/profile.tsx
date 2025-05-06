@@ -9,7 +9,6 @@ const Profile: React.FC = () => {
                   </IonAvatar>
       <IonLabel>
         <h2>Profile</h2>
-        <p>Developer</p>
       </IonLabel>
     </IonItem>
   );
