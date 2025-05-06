@@ -16,9 +16,11 @@ import {
   import { homeOutline, informationOutline, logOutOutline, personCircleOutline, rocketOutline } from 'ionicons/icons';
   import { Redirect, Route } from 'react-router';
   import Home from './Home';
+import EditProfile from './EditProfile';
   const Menu: React.FC = () => {
     const path = [
       { name: 'Home', url: '/cephaline-supabase/app/home', icon: homeOutline },
+      { name: 'Profile', url: '/it35-lab/app/editProfile', icon: personCircleOutline }
     ]
   
     const glow = {
@@ -84,6 +86,7 @@ import {
           <IonContent className="ion-padding">
             <IonRouterOutlet id="main">
               <Route exact path="/cephaline-supabase/app/home" component={Home} />
+              <Route exact path="/it35-lab/app/editProfile" component={EditProfile} />
               <Route exact path="/cephaline-supabase/app">
                 <Redirect to="/cephaline-supabase/app/home" />
               </Route>
