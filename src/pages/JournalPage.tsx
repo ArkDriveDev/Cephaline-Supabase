@@ -1,133 +1,109 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   IonPage, 
   IonHeader, 
   IonToolbar, 
   IonTitle, 
   IonContent, 
-  IonButtons, 
-  IonMenuButton,
   useIonToast,
-  useIonRouter
+  useIonRouter 
 } from '@ionic/react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '../utils/supaBaseClient'; 
+import { supabase } from '../utils/supaBaseClient';
 import PageTitle from '../components/JournalPage_omponents/PageTitle';
 import Spectrum from '../components/JournalPage_omponents/Spectrum';
 import Journalized from '../components/JournalPage_omponents/Journalized';
-import Attachments from '../components/JournalPage_omponents/Attachements';
 import SavePage from '../components/JournalPage_omponents/SavePage';
 
-interface Attachment {
-  type: string;
-  content: string;
-}
 
 const JournalPage: React.FC = () => {
   const { journalId } = useParams<{ journalId: string }>();
-  const [entry, setEntry] = useState<string>('');
-  const [mood, setMood] = useState<string>('Neutral');
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [entry, setEntry] = useState('');
+  const [pageTitle, setPageTitle] = useState('Untitled Entry');
+  const [mood, setMood] = useState('Neutral');
+  const [isSaving, setIsSaving] = useState(false);
   const [present] = useIonToast();
   const router = useIonRouter();
-
-  // Validate journalId on component mount
-  useEffect(() => {
-    const isValidUUID = (id: string) => {
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-    };
-
-    if (!journalId || !isValidUUID(journalId)) {
-      present({
-        message: 'Invalid journal ID',
-        duration: 3000,
-        color: 'danger'
-      });
-      router.push('/cephaline-supabase/app/home');
-    }
-    setIsLoading(false);
-  }, [journalId, present, router]);
-
-  const handleAttach = (attachment: Attachment) => {
-    const formatted = `\n[${attachment.type.toUpperCase()}] ${attachment.content}`;
-    setEntry((prev) => prev + formatted);
-  };
 
   const getNextPageNumber = async (): Promise<number> => {
     try {
       const { data, error } = await supabase
         .from('journal_pages')
         .select('page_no')
-        .eq('journal_id', journalId)
-        .order('page_no', { ascending: false })
-        .limit(1);
+        .eq('journal_id', journalId || '') // Handle potential undefined
+        .order('page_no', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Supabase error: ${error.message}`);
+      }
 
-      return data?.[0]?.page_no ? data[0].page_no + 1 : 1;
-    } catch (error) {
-      console.error('Error fetching page numbers:', error);
-      return 1; // Fallback to first page
+      if (!data || data.length === 0) return 1;
+      return data[0].page_no + 1;
+    } catch (error: any) {
+      console.error('Page number error:', error.message);
+      present({
+        message: 'Error loading journal data',
+        duration: 3000,
+        color: 'danger'
+      });
+      return 1; // Fallback
     }
   };
 
-  const handleSave = async (): Promise<void> => {
+  const handleSave = async () => {
     if (!entry.trim()) {
-      await present({
-        message: 'Please write something before saving',
-        duration: 2000,
-        color: 'warning'
-      });
+      present({ message: 'Journal content required', duration: 2000, color: 'warning' });
       return;
     }
 
     setIsSaving(true);
-    
+
     try {
+      // Validate journalId is a valid UUID
+      if (!journalId || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(journalId)) {
+        throw new Error('Invalid journal ID format');
+      }
+
       const pageNo = await getNextPageNumber();
-      
+
       // Create journal page
-      const { data: pageData, error: pageError } = await supabase
+      const { data: page, error: pageError } = await supabase
         .from('journal_pages')
         .insert({
           journal_id: journalId,
-          page_title: `Entry ${pageNo}`,
+          page_title: pageTitle || 'Untitled Entry',
           mood: mood,
           page_no: pageNo
         })
-        .select()
+        .select('page_id, journal_id')
         .single();
 
       if (pageError) throw pageError;
 
-      // Create page content
+      // Create content
       const { error: contentError } = await supabase
         .from('journal_page_contents')
         .insert({
-          page_id: pageData.page_id,
+          page_id: page.page_id,
           content_order: 1,
-          paragraph: entry
+          paragraph: entry,
+          created_at: new Date().toISOString()
         });
 
       if (contentError) {
-        // Rollback page creation if content fails
+        // Rollback page creation
         await supabase
           .from('journal_pages')
           .delete()
-          .eq('page_id', pageData.page_id);
+          .eq('page_id', page.page_id);
         throw contentError;
       }
 
-      await present({
-        message: 'Journal saved successfully!',
-        duration: 2000,
-        color: 'success'
-      });
+      present({ message: 'Saved successfully!', duration: 2000, color: 'success' });
       router.push('/cephaline-supabase/app/home');
     } catch (error: any) {
       console.error('Save error:', error);
-      await present({
+      present({
         message: error.message || 'Failed to save journal',
         duration: 3000,
         color: 'danger'
@@ -137,53 +113,21 @@ const JournalPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <IonPage>
-        <IonHeader>
-          <IonToolbar>
-            <IonTitle>Loading...</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-        <IonContent>Loading journal...</IonContent>
-      </IonPage>
-    );
-  }
-
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start">
-            <IonMenuButton />
-          </IonButtons>
-          <IonTitle>Journal Entry</IonTitle>
+          <IonTitle>New Entry</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent>
-        <PageTitle />
-        <h1 style={{ margin: '30px', marginTop: '80px' }}>How are you feeling today?</h1>
-        
+        <PageTitle onTitleChange={setPageTitle} />
         <Spectrum onMoodChange={setMood} />
-        
-        <Journalized 
-          entry={entry} 
-          onEntryChange={setEntry} 
+        <Journalized entry={entry} onEntryChange={setEntry} />
+        <SavePage
+          onSave={handleSave} 
+          disabled={isSaving || !entry.trim()} 
         />
-        
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginTop: '20px',
-          padding: '0 30px'
-        }}>
-          <Attachments onAttach={handleAttach} />
-          <SavePage 
-            onSave={handleSave} 
-            disabled={!entry.trim() || isSaving} 
-          />
-        </div>
       </IonContent>
     </IonPage>
   );
