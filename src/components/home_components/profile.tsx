@@ -83,7 +83,7 @@ const Profile: React.FC = () => {
       {/* Profile Info */}
       <IonLabel>
         <h2 style={{ margin: '8px 0', fontSize: '1.5rem' }}>{name}</h2>
-        <p style={{ margin: '8px 0', color: 'black' , }}>{bio}</p>
+        <p style={{ margin: '8px 0', color: '#000' }}>{bio}</p>
       </IonLabel>
 
       {/* Edit Button */}
