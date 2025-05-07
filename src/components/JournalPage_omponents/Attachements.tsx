@@ -8,17 +8,27 @@ import {
   closeOutline
 } from 'ionicons/icons';
 
+// Add this type declaration (usually in a separate types.d.ts file)
+declare module 'react' {
+  interface InputHTMLAttributes<T> {
+    webkitdirectory?: string | boolean;
+    directory?: string | boolean;
+    mozdirectory?: string | boolean;
+  }
+}
+
 const icons = [
   { id: 'link', icon: linkOutline, label: 'Attach Link' },
   { id: 'image', icon: imageOutline, label: 'Attach Image' },
-  { id: 'file', icon: documentAttachOutline, label: 'Attach Document' }, // Changed label to Document
+  { id: 'file', icon: documentAttachOutline, label: 'Attach Document' },
   { id: 'folder', icon: folderOpenOutline, label: 'Attach Folder' }
 ];
 
 interface Attachment {
   type: string;
   content: string;
-  file?: File; // Added file to the interface
+  file?: File;
+  files?: File[];
 }
 
 const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({ onAttach }) => {
@@ -30,18 +40,20 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   const [linkUrl, setLinkUrl] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFolderFiles, setSelectedFolderFiles] = useState<File[]>([]);
 
   // Allowed document file types
   const allowedFileTypes = [
     'application/pdf',
     'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'text/plain'
   ];
 
@@ -56,6 +68,13 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       } else {
         alert('Please select a valid document file (PDF, Word, Excel, PowerPoint, or Text)');
       }
+    }
+  };
+
+  const handleFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setSelectedFolderFiles(Array.from(files));
     }
   };
 
@@ -117,6 +136,21 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     }
   };
 
+  const handleAttachFolder = () => {
+    if (selectedFolderFiles.length > 0) {
+      const folderPath = selectedFolderFiles[0].webkitRelativePath;
+      const folderName = folderPath.split('/')[0];
+      
+      onAttach({
+        type: 'folder',
+        content: `[Folder: ${folderName}]`,
+        files: selectedFolderFiles
+      });
+      setSelectedFolderFiles([]);
+      setShowFolderModal(false);
+    }
+  };
+
   const handleCloseModal = () => {
     setShowLinkModal(false);
     setShowImageModal(false);
@@ -125,6 +159,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     setLinkUrl('');
     setSelectedImage(null);
     setSelectedFile(null);
+    setSelectedFolderFiles([]);
   };
 
   const getFileIcon = (fileName: string) => {
@@ -303,7 +338,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         </IonContent>
       </IonModal>
 
-      {/* File Modal - Updated for documents */}
+      {/* File Modal */}
       <IonModal
         isOpen={showFileModal}
         onDidDismiss={handleCloseModal}
@@ -424,23 +459,65 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexGrow: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center'
+              justifyContent: selectedFolderFiles.length > 0 ? 'flex-start' : 'center',
+              alignItems: 'center',
+              overflowY: 'auto'
             }}>
-              <IonIcon
-                icon={folderOpenOutline}
-                size="large"
-                style={{ marginBottom: '8px' }}
-              />
-              <p>Drag and drop folders here or</p>
-              <IonButton
-                fill="outline"
-                style={{ marginTop: '8px' }}
-                onClick={() => console.log('Select folder clicked')}
-              >
-                Select Folder
-              </IonButton>
+              {selectedFolderFiles.length > 0 ? (
+                <div style={{ width: '100%', textAlign: 'left' }}>
+                  <p style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+                    {selectedFolderFiles[0].webkitRelativePath.split('/')[0]} ({selectedFolderFiles.length} files)
+                  </p>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {selectedFolderFiles.map((file, index) => (
+                      <div key={index} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        padding: '4px 0',
+                        borderBottom: '1px solid #eee'
+                      }}>
+                        <IonIcon 
+                          icon={documentAttachOutline} 
+                          style={{ marginRight: '8px', color: '#666' }} 
+                        />
+                        <span style={{ fontSize: '14px' }}>
+                          {file.webkitRelativePath.split('/').slice(1).join('/')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <IonIcon
+                    icon={folderOpenOutline}
+                    size="large"
+                    style={{ marginBottom: '8px' }}
+                  />
+                  <p>Drag and drop folders here or</p>
+                  <IonButton
+                    fill="outline"
+                    style={{ marginTop: '8px' }}
+                    onClick={() => folderInputRef.current?.click()}
+                  >
+                    Select Folder
+                  </IonButton>
+                  <input
+                    type="file"
+                    ref={folderInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleFolderChange}
+                    webkitdirectory=""
+                    multiple
+                  />
+                </>
+              )}
             </div>
-            <IonButton expand="block" onClick={() => console.log('Attach folder functionality')}>
+            <IonButton 
+              expand="block" 
+              onClick={handleAttachFolder}
+              disabled={selectedFolderFiles.length === 0}
+            >
               Attach Folder
             </IonButton>
           </div>
