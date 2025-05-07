@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { IonIcon, IonRow, IonCol, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInput, IonButtons } from '@ionic/react';
 import {
   linkOutline,
@@ -28,8 +28,10 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleIconClick = (id: string) => {
-    switch(id) {
+    switch (id) {
       case 'link':
         setShowLinkModal(true);
         break;
@@ -54,7 +56,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       if (!/^https?:\/\//i.test(linkUrl)) {
         formattedUrl = 'http://' + linkUrl;
       }
-      
+
       onAttach({
         type: 'link',
         content: formattedUrl
@@ -166,13 +168,13 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
             height: '100%',
             justifyContent: 'space-between'
           }}>
-            <div style={{ 
+            <div style={{
               border: '2px dashed #ccc',
               borderRadius: '8px',
               padding: '20px',
@@ -183,20 +185,35 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <IonIcon 
-                icon={imageOutline} 
-                size="large" 
-                style={{ marginBottom: '8px' }} 
+              <IonIcon
+                icon={imageOutline}
+                size="large"
+                style={{ marginBottom: '8px' }}
               />
               <p>Drag and drop images here or</p>
-              <IonButton 
-                fill="outline" 
+              <IonButton
+                fill="outline"
                 style={{ marginTop: '8px' }}
-                onClick={() => console.log('Select image clicked')}
+                onClick={() => fileInputRef.current?.click()}
               >
                 Select from device
               </IonButton>
+
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    console.log('Selected image:', file);
+                    // You can now set state, preview image, etc.
+                  }
+                }}
+              />
             </div>
+
             <IonButton expand="block" onClick={() => console.log('Attach image functionality')}>
               Attach Image
             </IonButton>
@@ -225,13 +242,13 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
             height: '100%',
             justifyContent: 'space-between'
           }}>
-            <div style={{ 
+            <div style={{
               border: '2px dashed #ccc',
               borderRadius: '8px',
               padding: '20px',
@@ -242,29 +259,29 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <IonIcon 
-                icon={documentAttachOutline} 
-                size="large" 
-                style={{ marginBottom: '8px' }} 
+              <IonIcon
+                icon={documentAttachOutline}
+                size="large"
+                style={{ marginBottom: '8px' }}
               />
               <p>Drag and drop files here or</p>
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                <IonButton 
-                  fill="outline" 
+                <IonButton
+                  fill="outline"
                   style={{ marginTop: '8px' }}
                   onClick={() => console.log('Select document clicked')}
                 >
                   Documents
                 </IonButton>
-                <IonButton 
-                  fill="outline" 
+                <IonButton
+                  fill="outline"
                   style={{ marginTop: '8px' }}
                   onClick={() => console.log('Select PDF clicked')}
                 >
                   PDFs
                 </IonButton>
-                <IonButton 
-                  fill="outline" 
+                <IonButton
+                  fill="outline"
                   style={{ marginTop: '8px' }}
                   onClick={() => console.log('Select other file clicked')}
                 >
@@ -300,13 +317,13 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
             height: '100%',
             justifyContent: 'space-between'
           }}>
-            <div style={{ 
+            <div style={{
               border: '2px dashed #ccc',
               borderRadius: '8px',
               padding: '20px',
@@ -317,14 +334,14 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <IonIcon 
-                icon={folderOpenOutline} 
-                size="large" 
-                style={{ marginBottom: '8px' }} 
+              <IonIcon
+                icon={folderOpenOutline}
+                size="large"
+                style={{ marginBottom: '8px' }}
               />
               <p>Drag and drop folders here or</p>
-              <IonButton 
-                fill="outline" 
+              <IonButton
+                fill="outline"
                 style={{ marginTop: '8px' }}
                 onClick={() => console.log('Select folder clicked')}
               >
