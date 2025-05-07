@@ -56,7 +56,7 @@ const JournalCards: React.FC = () => {
 
   if (journals.length === 0) {
     return (
-      <div className="empty-state">
+      <div className="empty-state" style={{ color: 'black' }}>
         <p>You don't have any journals yet. Create one to get started!</p>
       </div>
     );
