@@ -1,3 +1,4 @@
+/* Updated CSS to fix the hover z-index issue */
 .journal-grid-container {
     display: flex;
     flex-wrap: wrap;
@@ -16,7 +17,7 @@
     flex-shrink: 0;
   }
   
-  /* Spine Styles (unchanged from your original) */
+  /* Spine Styles - unchanged */
   .journal-spine {
     position: relative;
     width: 100%;
@@ -29,20 +30,53 @@
     transform-origin: left center;
     transition: transform 0.3s ease;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-    z-index: 2;
+    z-index: 1; /* Changed from 2 to 1 */
     border-right: 1px solid rgba(0,0,0,0.1);
     background-image: 
-        linear-gradient(to right, 
-            rgba(255,255,255,0.1) 0%,
-            transparent 5%),
-        repeating-linear-gradient(to right,
-            rgba(255,255,255,0.05) 0px,
-            rgba(255,255,255,0.05) 1px,
-            transparent 1px,
-            transparent 3px);
+      linear-gradient(to right, 
+        rgba(255,255,255,0.1) 0%,
+        transparent 5%),
+      repeating-linear-gradient(to right,
+        rgba(255,255,255,0.05) 0px,
+        rgba(255,255,255,0.05) 1px,
+        transparent 1px,
+        transparent 3px);
     overflow: hidden;
   }
   
+  /* Preview card positioning */
+  .journal-card-preview {
+    position: absolute;
+    left: 50px;
+    top: 0;
+    width: 180px;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    transition: 
+      opacity 0.3s ease,
+      left 0.3s ease;
+    z-index: 2; /* Higher than spine */
+  }
+  
+  /* Hover Effects - updated z-index */
+  .journal-card-wrapper:hover {
+    transform: translateX(10px);
+    z-index: 3; /* Ensures hovered item stays above others */
+  }
+  
+  .journal-card-wrapper:hover .journal-spine {
+    transform: perspective(800px) rotateY(-30deg);
+    z-index: 2;
+  }
+  
+  .journal-card-wrapper:hover .journal-card-preview {
+    opacity: 1;
+    left: 55px;
+    z-index: 3; /* Highest when hovered */
+  }
+  
+  /* The rest of your CSS remains exactly the same */
   .journal-spine::after {
     content: "";
     position: absolute;
@@ -51,11 +85,11 @@
     bottom: 0;
     width: 10px;
     background: repeating-linear-gradient(
-        to right,
-        rgba(0,0,0,0.05) 0px,
-        rgba(0,0,0,0.05) 1px,
-        rgba(255,255,255,0.05) 1px,
-        rgba(255,255,255,0.05) 3px
+      to right,
+      rgba(0,0,0,0.05) 0px,
+      rgba(0,0,0,0.05) 1px,
+      rgba(255,255,255,0.05) 1px,
+      rgba(255,255,255,0.05) 3px
     );
     z-index: 1;
     border-radius: 0 3px 3px 0;
@@ -68,18 +102,18 @@
     right: 5px;
     height: 2px;
     background: linear-gradient(
-        to right, 
-        rgba(0,0,0,0.1) 0%,
-        rgba(0,0,0,0.3) 50%,
-        rgba(0,0,0,0.1) 100%
+      to right, 
+      rgba(0,0,0,0.1) 0%,
+      rgba(0,0,0,0.3) 50%,
+      rgba(0,0,0,0.1) 100%
     );
     z-index: 3;
   }
   .journal-spine::before { 
     top: 5px;
     box-shadow: 
-        0 -3px 0 rgba(255,255,255,0.1),
-        0 -6px 0 rgba(255,255,255,0.05);
+      0 -3px 0 rgba(255,255,255,0.1),
+      0 -6px 0 rgba(255,255,255,0.05);
   }
   
   .journal-title-container {
@@ -106,20 +140,6 @@
     margin-top: 6px;
   }
   
-  .journal-card-preview {
-    position: absolute;
-    left: 50px;
-    top: 0;
-    width: 180px;
-    height: 100%;
-    opacity: 0;
-    pointer-events: none;
-    transition: 
-        opacity 0.3s ease,
-        left 0.3s ease;
-    z-index: 3;
-  }
-  
   .journal-card {
     position: relative;
     height: 100%;
@@ -139,38 +159,24 @@
     right: 5px;
     height: 2px;
     background: linear-gradient(
-        to right, 
-        rgba(0,0,0,0.1) 0%,
-        rgba(0,0,0,0.3) 50%,
-        rgba(0,0,0,0.1) 100%
+      to right, 
+      rgba(0,0,0,0.1) 0%,
+      rgba(0,0,0,0.3) 50%,
+      rgba(0,0,0,0.1) 100%
     );
     z-index: 3;
   }
   .journal-card::before { 
     top: 5px;
     box-shadow: 
-        0 -3px 0 rgba(228, 218, 218, 0.1),
-        0 -6px 0 rgba(255,255,255,0.05);
+      0 -3px 0 rgba(228, 218, 218, 0.1),
+      0 -6px 0 rgba(255,255,255,0.05);
   }
   .journal-card::after { 
     bottom: 5px;
     box-shadow: 
-        0 3px 0 rgba(255,255,255,0.1),
-        0 6px 0 rgba(255,255,255,0.05);
-  }
-  
-  /* Hover Effects (unchanged) */
-  .journal-card-wrapper:hover {
-    transform: translateX(10px);
-  }
-  
-  .journal-card-wrapper:hover .journal-spine {
-    transform: perspective(800px) rotateY(-30deg);
-  }
-  
-  .journal-card-wrapper:hover .journal-card-preview {
-    opacity: 1;
-    left: 55px;
+      0 3px 0 rgba(255,255,255,0.1),
+      0 6px 0 rgba(255,255,255,0.05);
   }
   
   .journal-card-wrapper:hover .journal-spine::after {
