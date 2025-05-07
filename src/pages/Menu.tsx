@@ -18,10 +18,12 @@ import { Redirect, Route } from 'react-router';
 import Home from './Home';
 import EditProfile from './EditProfile';
 import JournalPage from './JournalPage';
+import Overviewing from './Overviewing';
+import PageList from './PageList';
 const Menu: React.FC = () => {
   const path = [
     { name: 'Home', url: '/cephaline-supabase/app/home', icon: homeOutline },
-    { name: 'Profile', url: '/cephaline-supabase/app/editProfile', icon: personCircleOutline }
+    { name: 'Profile', url: '/cephaline-supabase/app/editProfile', icon: personCircleOutline },
   ]
 
   const glow = {
@@ -88,6 +90,12 @@ const Menu: React.FC = () => {
           <Route exact path="/cephaline-supabase/app/home" component={Home} />
           <Route exact path="/cephaline-supabase/app/editProfile" component={EditProfile} />
           <Route exact path="/cephaline-supabase/app/JournalPage/:journalId?" component={JournalPage} />
+          <Route exact path="/cephaline-supabase/app/page-list/:journalId" component={PageList} />
+          <Route
+            exact
+            path="/cephaline-supabase/app/Overviewing/:journalId"
+            component={Overviewing}
+          />
           <Route exact path="/cephaline-supabase/app">
             <Redirect to="/cephaline-supabase/app/home" />
           </Route>

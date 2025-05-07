@@ -41,8 +41,29 @@ const JournalCards: React.FC = () => {
     fetchJournals();
   }, []);
 
-  const handleCardClick = (journalId: string) => {
-    history.push(`/cephaline-supabase/app/JournalPage/:${journalId}`);
+  const handleCardClick = async (journalId: string) => {
+    try {
+      // First check if journal has any pages
+      const { data: journalPages, error } = await supabase
+        .from('journal_pages')
+        .select('page_id')
+        .eq('journal_id', journalId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+  
+      if (error) throw error;
+  
+      if (journalPages && journalPages.length > 0) {
+        // If pages exist, go to Overview with the most recent pageId
+        history.push(`/cephaline-supabase/app/Overviewing/${journalId}`);
+      } else {
+        // If no pages, go to JournalPage to create first page
+        history.push(`/cephaline-supabase/app/JournalPage/${journalId}`);
+      }
+    } catch (err) {
+      console.error('Error checking journal pages:', err);
+      history.push(`/cephaline-supabase/app/JournalPage/${journalId}`);
+    }
   };
 
   if (loading) {
