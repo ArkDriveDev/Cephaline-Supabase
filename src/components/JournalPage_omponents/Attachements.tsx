@@ -1,10 +1,15 @@
 import React from 'react';
 import { IonIcon, IonRow, IonCol } from '@ionic/react';
-import { linkOutline, imageOutline, documentAttachOutline } from 'ionicons/icons';
+import {
+  linkOutline,
+  imageOutline,
+  documentAttachOutline,
+  folderOpenOutline
+} from 'ionicons/icons';
 
 const Attachments: React.FC = () => {
   return (
-    <IonRow style={{ justifyContent: 'flex-start', gap: '16px', padding: '8px' }}>
+    <IonRow style={{ justifyContent: 'flex-start', gap: '1px', padding: '8px' }}>
       <IonCol size="auto">
         <IonIcon
           icon={linkOutline}
@@ -26,6 +31,14 @@ const Attachments: React.FC = () => {
           icon={documentAttachOutline}
           size="large"
           onClick={() => console.log('Attach File')}
+          style={{ cursor: 'pointer' }}
+        />
+      </IonCol>
+      <IonCol size="auto">
+        <IonIcon
+          icon={folderOpenOutline}
+          size="large"
+          onClick={() => console.log('Attach Folder')}
           style={{ cursor: 'pointer' }}
         />
       </IonCol>

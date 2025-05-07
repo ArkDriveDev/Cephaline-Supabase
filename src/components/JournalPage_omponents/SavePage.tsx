@@ -5,7 +5,6 @@ import { saveOutline } from 'ionicons/icons';
 const SavePage: React.FC = () => {
   const handleSave = () => {
     console.log('Page saved!');
-    // Add your save logic here
   };
 
   return (
