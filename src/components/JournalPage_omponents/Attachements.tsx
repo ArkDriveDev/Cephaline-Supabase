@@ -228,8 +228,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         isOpen={showLinkModal}
         onDidDismiss={handleCloseModal}
         style={{
-          '--height': '25%',
-          '--border-radius': '16px',
+          '--height': '40%',
+          '--border-radius': '10px',
           '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
         }}
       >
@@ -261,7 +261,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         isOpen={showImageModal}
         onDidDismiss={handleCloseModal}
         style={{
-          '--height': '40%',
+          '--height': '60%',
           '--border-radius': '16px',
           '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
         }}
@@ -313,6 +313,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     fill="outline"
                     style={{ marginTop: '8px' }}
                     onClick={() => fileInputRef.current?.click()}
+                    color={"light"}
                   >
                     Select from device
                   </IonButton>
@@ -343,7 +344,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         isOpen={showFileModal}
         onDidDismiss={handleCloseModal}
         style={{
-          '--height': '50%',
+          '--height': '60%',
           '--border-radius': '16px',
           '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
         }}
@@ -399,6 +400,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     fill="outline"
                     style={{ marginTop: '8px' }}
                     onClick={() => fileInputRef.current?.click()}
+                    color={"light"}
                   >
                     Select Document
                   </IonButton>
@@ -428,7 +430,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         isOpen={showFolderModal}
         onDidDismiss={handleCloseModal}
         style={{
-          '--height': '50%',
+          '--height': '70%',
           '--border-radius': '16px',
           '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
         }}
@@ -499,6 +501,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     fill="outline"
                     style={{ marginTop: '8px' }}
                     onClick={() => folderInputRef.current?.click()}
+                    color={"light"}
                   >
                     Select Folder
                   </IonButton>

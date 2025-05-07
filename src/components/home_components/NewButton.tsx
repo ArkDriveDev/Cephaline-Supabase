@@ -114,7 +114,7 @@ const NewButton: React.FC<NewButtonProps> = ({ onJournalCreated }) => {
       <IonButton 
         onClick={() => setShowModal(true)} 
         expand="block" 
-        color="primary"
+        color="secondary"
         style={{ margin: '0 10px' }}
       >
         <IonIcon slot="start" icon={bookOutline} />

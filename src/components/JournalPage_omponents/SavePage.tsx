@@ -1,25 +1,27 @@
 import React from 'react';
-import { IonButton, IonIcon, useIonRouter } from '@ionic/react';
-import { saveOutline } from 'ionicons/icons';
+import { IonButton, IonSpinner } from '@ionic/react';
 
 interface SavePageProps {
-  onSave: () => Promise<void>;
+  onSave: () => void;
+  disabled: boolean;
+  loading: boolean;  // Add this prop
 }
 
-const SavePage: React.FC<SavePageProps> = ({ onSave }) => {
-  const handleSave = async () => {
-    try {
-      await onSave();
-      console.log('Page saved successfully!');
-    } catch (error) {
-      console.error('Error saving page:', error);
-    }
-  };
-
+const SavePage: React.FC<SavePageProps> = ({ onSave, disabled, loading }) => {
   return (
-    <IonButton onClick={handleSave}>
-      <IonIcon icon={saveOutline} slot="start" />
-      Save Page
+    <IonButton 
+      onClick={onSave} 
+      disabled={disabled || loading}
+      expand="block"
+    >
+      {loading ? (
+        <>
+          <IonSpinner name="crescent" />
+          Saving...
+        </>
+      ) : (
+        'Save Page'
+      )}
     </IonButton>
   );
 };

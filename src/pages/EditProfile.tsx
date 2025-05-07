@@ -30,7 +30,7 @@ const EditProfile: React.FC = () => {
       if (sessionError || !session || !session.session) {
         setAlertMessage('You must be logged in to access this page.');
         setShowAlert(true);
-        history.push('/it35-lab/login');
+        history.push('/cephaline-supabase/login');
         return;
       }
   
@@ -175,7 +175,7 @@ const EditProfile: React.FC = () => {
       </IonHeader>
       <IonContent className="ion-padding">
         <IonItem>
-          <IonText color="secondary">
+          <IonText color="dark">
             <h1>Edit Account</h1>
           </IonText>
         </IonItem>

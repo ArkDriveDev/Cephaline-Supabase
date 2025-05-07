@@ -3,12 +3,13 @@ import Profile from '../components/home_components/profile';
 import Searchbar from '../components/home_components/SearchBar';
 import NewButton from '../components/home_components/NewButton';
 import JournalCards from '../components/home_components/JournalCards';
+import '../theme/variables.css';
 const Home: React.FC = () => {
     return (
         <IonPage>
             <IonHeader>
                 <IonToolbar>
-                    <IonTitle>Journals</IonTitle>
+                    <IonTitle></IonTitle>
                 </IonToolbar>
             </IonHeader>
             <IonContent>

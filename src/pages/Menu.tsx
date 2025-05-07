@@ -32,17 +32,17 @@ const Menu: React.FC = () => {
   const h1Style = {
     ...glow,
     animationDelay: '0.1s',
-    color: 'skyblue',
+    color: 'white',
   };
   const h2Style = {
     display: 'flex',
-    color: 'skyblue',
+    color: 'white',
     margin: '3%'
   };
 
   const h3Style = {
     display: 'flex',
-    color: 'skyblue',
+    color: 'white',
   };
 
   return (
