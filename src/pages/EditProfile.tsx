@@ -1,35 +1,87 @@
-import {
-    IonButtons,
-    IonContent,
-    IonHeader,
-    IonMenuButton,
-    IonPage,
-    IonTitle,
-    IonToolbar
-} from '@ionic/react';
-import AvatarUploader from '../components/AvatarUploader';
-import React, { useRef, useState } from 'react';  
+import React from 'react';
+import { IonCol, IonGrid, IonInput, IonRow, IonText } from '@ionic/react';
+import { IonInputPasswordToggle } from '@ionic/react';
 
-const EditProfile: React.FC = () => {
-  const fileInputRef = useRef<HTMLInputElement| null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+interface PasswordChangeFormProps {
+  password: string;
+  confirmPassword: string;
+  currentPassword: string;
+  setPassword: (value: string) => void;
+  setConfirmPassword: (value: string) => void;
+  setCurrentPassword: (value: string) => void;
+}
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setAvatarPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
+const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
+  password,
+  confirmPassword,
+  currentPassword,
+  setPassword,
+  setConfirmPassword,
+  setCurrentPassword,
+}) => {
   return (
-    <AvatarUploader
-      avatarPreview={avatarPreview}
-      fileInputRef={fileInputRef}  
-      handleAvatarChange={handleAvatarChange}
-    />
+    <>
+      <IonGrid>
+        <IonRow>
+          <IonText color="secondary">
+            <h3>Change Password</h3>
+          </IonText>
+          <IonCol size="12">
+            <IonInput
+              label="New Password"
+              type="password"
+              labelPlacement="floating"
+              fill="outline"
+              placeholder="Enter New Password"
+              value={password}
+              onIonChange={(e) => setPassword(e.detail.value!)}
+            >
+              <IonInputPasswordToggle slot="end" />
+            </IonInput>
+          </IonCol>
+        </IonRow>
+      </IonGrid>
+
+      <IonGrid>
+        <IonRow>
+          <IonCol size="12">
+            <IonInput
+              label="Confirm Password"
+              type="password"
+              labelPlacement="floating"
+              fill="outline"
+              placeholder="Confirm New Password"
+              value={confirmPassword}
+              onIonChange={(e) => setConfirmPassword(e.detail.value!)}
+            >
+              <IonInputPasswordToggle slot="end" />
+            </IonInput>
+          </IonCol>
+        </IonRow>
+      </IonGrid>
+
+      <IonGrid>
+        <IonRow>
+          <IonText color="secondary">
+            <h3>Confirm Changes</h3>
+          </IonText>
+          <IonCol size="12">
+            <IonInput
+              label="Current Password"
+              type="password"
+              labelPlacement="floating"
+              fill="outline"
+              placeholder="Enter Current Password to Save Changes"
+              value={currentPassword}
+              onIonChange={(e) => setCurrentPassword(e.detail.value!)}
+            >
+              <IonInputPasswordToggle slot="end" />
+            </IonInput>
+          </IonCol>
+        </IonRow>
+      </IonGrid>
+    </>
   );
 };
 
-export default EditProfile;
+export default PasswordChangeForm;
