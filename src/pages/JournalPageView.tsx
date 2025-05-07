@@ -10,28 +10,19 @@ import {
   IonIcon,
   IonButton,
   IonText,
-  IonLoading
+  IonLoading,
+  IonBadge
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
-import { chevronBack, chevronForward, createOutline } from 'ionicons/icons';
-import './JournalPageView.css'; // We'll create this CSS file
-
-interface JournalPage {
-  page_id: string;
-  journal_id: string;
-  page_no: number;
-  page_title: string;
-  content: string;
-  mood: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { chevronBack, chevronForward, createOutline, addOutline } from 'ionicons/icons';
+import './JournalPageView.css';
 
 const JournalPageView: React.FC = () => {
   const { journalId, pageId } = useParams<{ journalId: string, pageId: string }>();
-  const [page, setPage] = useState<JournalPage | null>(null);
+  const [page, setPage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [contentCount, setContentCount] = useState(0);
   const [adjacentPages, setAdjacentPages] = useState<{prev: string | null, next: string | null}>({prev: null, next: null});
   const history = useHistory();
 
@@ -49,6 +40,14 @@ const JournalPageView: React.FC = () => {
 
         if (pageError) throw pageError;
         setPage(pageData);
+
+        // Fetch content count
+        const { count: contentCount, error: countError } = await supabase
+          .from('journal_page_contents')
+          .select('*', { count: 'exact' })
+          .eq('page_id', pageId);
+
+        if (!countError && contentCount) setContentCount(contentCount);
 
         // Fetch adjacent pages
         const { data: adjacentData, error: adjacentError } = await supabase
@@ -77,8 +76,8 @@ const JournalPageView: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
+    return date.toLocaleString('en-US', {
+      month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
@@ -87,7 +86,15 @@ const JournalPageView: React.FC = () => {
   };
 
   const handleEdit = () => {
-    history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}/edit`);
+    history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}`);
+  };
+
+  const handleAddContent = () => {
+    history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}/content`);
+  };
+
+  const handleViewContents = () => {
+    history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${pageId}/contents`);
   };
 
   if (loading) {
@@ -125,6 +132,9 @@ const JournalPageView: React.FC = () => {
           </IonButtons>
           <IonTitle>Page {page.page_no}</IonTitle>
           <IonButtons slot="end">
+            <IonButton onClick={handleAddContent}>
+              <IonIcon slot="icon-only" icon={addOutline} />
+            </IonButton>
             <IonButton onClick={handleEdit}>
               <IonIcon slot="icon-only" icon={createOutline} />
             </IonButton>
@@ -136,7 +146,7 @@ const JournalPageView: React.FC = () => {
         <div className="journal-page-container">
           <div className="journal-page-header">
             <h1>{page.page_title}</h1>
-            {page.mood && <span className="mood-badge">{page.mood}</span>}
+            {page.mood && <IonBadge color="tertiary">{page.mood}</IonBadge>}
             <div className="page-metadata">
               <IonText color="medium">
                 <small>Created: {formatDate(page.created_at)}</small>
@@ -153,11 +163,25 @@ const JournalPageView: React.FC = () => {
             </IonText>
           </div>
 
+          <div className="content-actions">
+            <IonButton 
+              fill="solid" 
+              color="primary"
+              onClick={handleViewContents}
+              disabled={contentCount === 0}
+            >
+              View Contents
+              <IonBadge color="light" style={{ marginLeft: '8px' }}>
+                {contentCount}
+              </IonBadge>
+            </IonButton>
+          </div>
+
           <div className="page-navigation">
             <IonButton 
               fill="clear" 
               disabled={!adjacentPages.prev}
-              onClick={() => adjacentPages.prev && history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${adjacentPages.prev}`)}
+              onClick={() => adjacentPages.prev && history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${adjacentPages.prev}`)}
             >
               <IonIcon slot="start" icon={chevronBack} />
               Previous
@@ -166,7 +190,7 @@ const JournalPageView: React.FC = () => {
             <IonButton 
               fill="clear" 
               disabled={!adjacentPages.next}
-              onClick={() => adjacentPages.next && history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${adjacentPages.next}`)}
+              onClick={() => adjacentPages.next && history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${adjacentPages.next}`)}
             >
               Next
               <IonIcon slot="end" icon={chevronForward} />
