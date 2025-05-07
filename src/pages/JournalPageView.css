@@ -13,10 +13,8 @@
     box-shadow: 0 0 15px rgba(0,0,0,0.08);
     min-height: calc(100% - 40px);
     position: relative;
-  }
-  
-  /* Paper texture with subtle grain */
-  .journal-page-container {
+    
+    /* Paper texture with subtle grain */
     background-image: 
       linear-gradient(#f9f5e9 0.1em, transparent 0.1em),
       radial-gradient(#d4d0c5 1px, transparent 1px);
@@ -42,16 +40,29 @@
     letter-spacing: -0.5px;
   }
   
-  .mood-badge {
+  /* Mood display styles */
+  .mood-display {
     display: inline-flex;
     align-items: center;
+    margin: 0.5em 0;
     background-color: rgba(25, 118, 210, 0.1);
-    color: #1976d2;
-    padding: 4px 12px;
     border-radius: 16px;
-    font-size: 0.85rem;
-    margin-left: 12px;
+    padding: 4px 12px;
+  }
+  
+  .mood-display ion-icon {
+    margin-right: 6px;
+    color: var(--ion-color-primary);
+    font-size: 1.1em;
+  }
+  
+  .mood-display ion-badge {
+    --background: transparent;
+    --color: #1976d2;
+    --padding-start: 0;
+    --padding-end: 0;
     font-weight: 500;
+    text-transform: capitalize;
   }
   
   .page-metadata {
@@ -85,30 +96,57 @@
     padding: 2em 0;
   }
   
-  /* Content Actions */
-  .content-actions {
+  /* Contents section */
+  .contents-section {
     margin: 2em 0;
+    padding-top: 1em;
+    border-top: 1px solid rgba(0,0,0,0.1);
+  }
+  
+  .contents-title {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    font-size: 1.3rem;
+    margin-bottom: 1em;
+    color: #333;
   }
   
-  .content-actions ion-button {
-    --padding-start: 1.5em;
-    --padding-end: 1.5em;
-    --border-radius: 8px;
-    font-weight: 500;
+  .empty-contents {
+    text-align: center;
+    padding: 2em;
+    color: #666;
   }
   
-  .content-actions ion-badge {
-    margin-left: 0.8em;
-    transform: translateY(-1px);
-    --background: white;
-    --color: var(--ion-color-primary);
-    --padding-start: 0.6em;
-    --padding-end: 0.6em;
+  /* Content items */
+  .content-item {
+    margin-bottom: 1.5em;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background: white;
   }
   
-  /* Page Navigation */
+  .content-item ion-card-content {
+    padding: 1em;
+  }
+  
+  .content-paragraph {
+    margin: 1em 0;
+    white-space: pre-line;
+  }
+  
+  .content-image {
+    margin: 1em 0;
+    text-align: center;
+  }
+  
+  .content-meta {
+    display: block;
+    margin-top: 0.8em;
+    font-size: 0.8em;
+    color: #666;
+  }
+  
+  /* Navigation */
   .page-navigation {
     display: flex;
     justify-content: space-between;
@@ -139,7 +177,7 @@
     }
   }
   
-  /* Animation for interactive elements */
+  /* Interactive elements */
   ion-button {
     transition: transform 0.2s ease, opacity 0.2s ease;
   }

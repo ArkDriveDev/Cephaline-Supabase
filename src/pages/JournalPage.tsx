@@ -37,6 +37,7 @@ const JournalPage: React.FC = () => {
   
   const [markdownContent, setMarkdownContent] = useState('');
   const [pageTitle, setPageTitle] = useState('');
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [present] = useIonToast();
@@ -44,7 +45,6 @@ const JournalPage: React.FC = () => {
   const handleFileUploadWithProgress = async (file: File) => {
     setIsUploading(true);
     try {
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       const userId = user?.id;
   
@@ -52,12 +52,10 @@ const JournalPage: React.FC = () => {
         throw new Error('You must be logged in to upload files');
       }
   
-      // Create file path
       const timestamp = Date.now();
       const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const filePath = `${userId}/${journalId}/${timestamp}_${sanitizedFileName}`;
   
-      // Upload file
       const { data: uploadData, error } = await supabase.storage
         .from('journal-contents')
         .upload(filePath, file, {
@@ -68,7 +66,6 @@ const JournalPage: React.FC = () => {
   
       if (error) throw error;
   
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('journal-contents')
         .getPublicUrl(filePath);
@@ -90,14 +87,12 @@ const JournalPage: React.FC = () => {
     try {
       let contentUrl = attachment.content;
       
-      // Handle file uploads
       if (attachment.content instanceof File) {
         const uploadedUrl = await handleFileUploadWithProgress(attachment.content);
         if (!uploadedUrl) return;
         contentUrl = uploadedUrl;
       }
   
-      // Simply add the URL to the content
       setMarkdownContent(prev => prev + `\n${contentUrl}\n`);
     } catch (error) {
       present({
@@ -115,13 +110,11 @@ const JournalPage: React.FC = () => {
     for (const line of lines) {
       if (!line.trim()) continue;
 
-      // Check if line is a URL
       try {
         new URL(line.trim());
         blocks.push({ type: 'link', content: line.trim() });
         continue;
       } catch (e) {
-        // Not a URL, treat as paragraph
         blocks.push({ type: 'paragraph', content: line });
       }
     }
@@ -159,7 +152,6 @@ const JournalPage: React.FC = () => {
     setIsSaving(true);
 
     try {
-      // Get last page number
       const { data: lastPage, error: pageError } = await supabase
         .from('journal_pages')
         .select('page_no')
@@ -170,20 +162,19 @@ const JournalPage: React.FC = () => {
       if (pageError) throw pageError;
       const nextPageNo = lastPage?.[0]?.page_no ? lastPage[0].page_no + 1 : 1;
 
-      // Create new page
       const { data: newPage, error: insertError } = await supabase
         .from('journal_pages')
         .insert({
           journal_id: journalId,
           page_title: pageTitle.trim(),
           page_no: nextPageNo,
+          mood: selectedMood // Store the selected mood
         })
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      // Parse and insert content
       const contentBlocks = parseContent(markdownContent);
       const contentInserts = contentBlocks.map((block, index) => ({
         page_id: newPage.page_id,
@@ -201,6 +192,7 @@ const JournalPage: React.FC = () => {
       present({ message: 'Journal page saved successfully!', duration: 2000, color: 'success' });
       setMarkdownContent('');
       setPageTitle('');
+      setSelectedMood(null);
     } catch (error: any) {
       present({
         message: `Failed to save: ${error.message}`,
@@ -237,7 +229,10 @@ const JournalPage: React.FC = () => {
         </IonCard>
 
         <h2 style={{ margin: '20px 0' }}>How are you feeling today?</h2>
-        <Spectrum />
+        <Spectrum 
+          selectedMood={selectedMood}
+          onMoodChange={setSelectedMood}
+        />
 
         <Journalized
           markdownContent={markdownContent}

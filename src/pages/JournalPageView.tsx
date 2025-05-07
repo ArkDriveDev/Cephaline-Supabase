@@ -11,18 +11,62 @@ import {
   IonButton,
   IonText,
   IonLoading,
-  IonBadge
+  IonBadge,
+  IonImg,
+  IonCard,
+  IonCardContent,
+  IonItem,
+  IonLabel
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
-import { chevronBack, chevronForward, createOutline, addOutline } from 'ionicons/icons';
+import { 
+  chevronBack, 
+  chevronForward, 
+  createOutline, 
+  addOutline, 
+  linkOutline, 
+  documentOutline, 
+  imageOutline, 
+  folderOutline,
+  happyOutline,
+  sadOutline,
+  heartOutline,
+  alertOutline,
+  thumbsUpOutline,
+  thumbsDownOutline,
+  helpOutline
+} from 'ionicons/icons';
 import './JournalPageView.css';
+
+// Mood to icon mapping
+const moodIcons: Record<string, any> = {
+  happy: happyOutline,
+  sad: sadOutline,
+  love: heartOutline,
+  angry: alertOutline,
+  like: thumbsUpOutline,
+  dislike: thumbsDownOutline,
+  default: helpOutline
+};
+
+interface ContentItem {
+  content_id: string;
+  content_order: number;
+  paragraph: string | null;
+  link: string | null;
+  image_url: string | null;
+  file_url: string | null;
+  folder_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const JournalPageView: React.FC = () => {
   const { journalId, pageId } = useParams<{ journalId: string, pageId: string }>();
   const [page, setPage] = useState<any>(null);
+  const [contents, setContents] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [contentCount, setContentCount] = useState(0);
   const [adjacentPages, setAdjacentPages] = useState<{prev: string | null, next: string | null}>({prev: null, next: null});
   const history = useHistory();
 
@@ -31,7 +75,6 @@ const JournalPageView: React.FC = () => {
       try {
         setLoading(true);
         
-        // Fetch current page
         const { data: pageData, error: pageError } = await supabase
           .from('journal_pages')
           .select('*')
@@ -41,15 +84,15 @@ const JournalPageView: React.FC = () => {
         if (pageError) throw pageError;
         setPage(pageData);
 
-        // Fetch content count
-        const { count: contentCount, error: countError } = await supabase
+        const { data: contentsData, error: contentsError } = await supabase
           .from('journal_page_contents')
-          .select('*', { count: 'exact' })
-          .eq('page_id', pageId);
+          .select('*')
+          .eq('page_id', pageId)
+          .order('content_order', { ascending: true });
 
-        if (!countError && contentCount) setContentCount(contentCount);
+        if (contentsError) throw contentsError;
+        setContents(contentsData || []);
 
-        // Fetch adjacent pages
         const { data: adjacentData, error: adjacentError } = await supabase
           .from('journal_pages')
           .select('page_id, page_no')
@@ -85,6 +128,11 @@ const JournalPageView: React.FC = () => {
     });
   };
 
+  const getMoodIcon = (mood: string) => {
+    const normalizedMood = mood.toLowerCase();
+    return moodIcons[normalizedMood] || moodIcons.default;
+  };
+
   const handleEdit = () => {
     history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}`);
   };
@@ -93,8 +141,78 @@ const JournalPageView: React.FC = () => {
     history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
-  const handleViewContents = () => {
-    history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${pageId}/contents`);
+  const renderContentItem = (item: ContentItem) => {
+    const getIcon = () => {
+      if (item.paragraph) return documentOutline;
+      if (item.image_url) return imageOutline;
+      if (item.link) return linkOutline;
+      if (item.file_url || item.folder_name) return folderOutline;
+      return documentOutline;
+    };
+
+    return (
+      <IonCard key={item.content_id} className="content-item">
+        <IonCardContent>
+          <IonItem lines="none">
+            <IonIcon icon={getIcon()} slot="start" />
+            <IonLabel>Item #{item.content_order}</IonLabel>
+          </IonItem>
+
+          {item.paragraph && (
+            <div className="content-paragraph">
+              <IonText>{item.paragraph}</IonText>
+            </div>
+          )}
+
+          {item.image_url && (
+            <div className="content-image">
+              <IonImg 
+                src={item.image_url} 
+                alt={`Content ${item.content_order}`}
+                style={{ maxHeight: '300px', objectFit: 'contain' }}
+              />
+            </div>
+          )}
+
+          {item.link && (
+            <IonButton 
+              fill="clear" 
+              href={item.link} 
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <IonIcon icon={linkOutline} slot="start" />
+              Open Link
+            </IonButton>
+          )}
+
+          {item.file_url && (
+            <IonButton 
+              fill="clear" 
+              href={item.file_url} 
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <IonIcon icon={folderOutline} slot="start" />
+              View File
+            </IonButton>
+          )}
+
+          {item.folder_name && (
+            <IonText color="medium">
+              <p>Folder: {item.folder_name}</p>
+            </IonText>
+          )}
+
+          <IonText color="medium" className="content-meta">
+            <small>Created: {formatDate(item.created_at)}</small>
+            {item.updated_at !== item.created_at && (
+              <small> • Updated: {formatDate(item.updated_at)}</small>
+            )}
+          </IonText>
+        </IonCardContent>
+      </IonCard>
+    );
   };
 
   if (loading) {
@@ -146,7 +264,17 @@ const JournalPageView: React.FC = () => {
         <div className="journal-page-container">
           <div className="journal-page-header">
             <h1>{page.page_title}</h1>
-            {page.mood && <IonBadge color="tertiary">{page.mood}</IonBadge>}
+            {page.mood && (
+              <div className="mood-display">
+                <IonIcon 
+                  icon={getMoodIcon(page.mood)} 
+                  style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }} 
+                />
+                <IonBadge color="tertiary">
+                  {page.mood.charAt(0).toUpperCase() + page.mood.slice(1)}
+                </IonBadge>
+              </div>
+            )}
             <div className="page-metadata">
               <IonText color="medium">
                 <small>Created: {formatDate(page.created_at)}</small>
@@ -157,24 +285,26 @@ const JournalPageView: React.FC = () => {
             </div>
           </div>
 
-          <div className="journal-page-text">
-            <IonText>
-              {page.content || <p className="empty-content">This page doesn't have any content yet.</p>}
-            </IonText>
-          </div>
-
-          <div className="content-actions">
-            <IonButton 
-              fill="solid" 
-              color="primary"
-              onClick={handleViewContents}
-              disabled={contentCount === 0}
-            >
-              View Contents
-              <IonBadge color="light" style={{ marginLeft: '8px' }}>
-                {contentCount}
+          <div className="contents-section">
+            <h2 className="contents-title">
+              Page Contents
+              <IonBadge color="primary" style={{ marginLeft: '8px' }}>
+                {contents.length}
               </IonBadge>
-            </IonButton>
+            </h2>
+
+            {contents.length === 0 ? (
+              <div className="empty-contents">
+                <IonText color="medium">No content items yet.</IonText>
+                <IonButton fill="clear" onClick={handleAddContent}>
+                  Add Content
+                </IonButton>
+              </div>
+            ) : (
+              <div className="contents-list">
+                {contents.map(renderContentItem)}
+              </div>
+            )}
           </div>
 
           <div className="page-navigation">
