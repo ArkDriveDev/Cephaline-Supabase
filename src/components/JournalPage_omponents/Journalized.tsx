@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { IonCard, IonCardContent, IonTextarea } from '@ionic/react';
 
-interface Attachment {
-  type: string;
-  content: string;
+interface JournalizedProps {
+  entry: string;
+  onEntryChange: (text: string) => void;
 }
 
-const Journalized: React.FC<{ attachments: Attachment[] }> = ({ attachments }) => {
-  const [entry, setEntry] = useState('');
-
+const Journalized: React.FC<JournalizedProps> = ({ entry, onEntryChange }) => {
   return (
     <IonCard style={{height:'400px'}}>
       <IonCardContent>
@@ -17,19 +15,9 @@ const Journalized: React.FC<{ attachments: Attachment[] }> = ({ attachments }) =
           placeholder="Journalize here..."
           autoGrow
           rows={6}
-          onIonChange={(e) => setEntry(e.detail.value!)}
+          onIonChange={(e) => onEntryChange(e.detail.value!)}
+          style={{ height: '100%' }}
         />
-        <div style={{ marginTop: '10px' }}>
-          {attachments.map((attachment, index) => (
-            <div key={index} style={{ marginBottom: '5px' }}>
-              {attachment.type === 'link' && (
-                <a href={attachment.content} target="_blank" rel="noopener noreferrer">
-                  {attachment.content}
-                </a>
-              )}
-            </div>
-          ))}
-        </div>
       </IonCardContent>
     </IonCard>
   );
