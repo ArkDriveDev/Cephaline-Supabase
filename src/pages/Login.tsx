@@ -43,14 +43,19 @@ const Login: React.FC = () => {
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
-      body {
-        background: linear-gradient(135deg, #74ebd5, #ACB6E5); /* Blue gradient */
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      ion-content {
+        --background: none;
+        background: linear-gradient(135deg, #000000,rgb(35, 115, 213), #ffffff) !important;
+      }
+
+      ion-toolbar {
+        --background: transparent !important;
+        background: transparent !important;
       }
   
       .fancy-card {
         backdrop-filter: blur(10px);
-        background: rgba(255, 255, 255, 0.07);
+        background:rgb(0, 0, 0);
         border: 1px solid rgba(255, 255, 255, 0.2);
         box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
         border-radius: 16px;
@@ -62,7 +67,7 @@ const Login: React.FC = () => {
         transform: scale(1.02);
         transition: transform 0.3s ease;
       }
-  
+    
       .fancy-input {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 8px;
@@ -70,7 +75,7 @@ const Login: React.FC = () => {
       }
   
       .fancy-button {
-        background: linear-gradient(to right, #6dd5ed, #2193b0);
+        background: linear-gradient(to right,rgb(52, 154, 177), #2193b0);
         color: white;
         font-weight: bold;
         transition: transform 0.2s;
@@ -93,7 +98,6 @@ const Login: React.FC = () => {
     `;
     document.head.appendChild(style);
   }, []);
-  
 
   const doLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -113,8 +117,8 @@ const Login: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar color="dark">
-          <IonTitle style={{ textAlign: 'center' }}>Login</IonTitle>
+        <IonToolbar>
+          <IonTitle style={{ textAlign: 'center' }}>Cephaline Coding Journal App</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -165,9 +169,9 @@ const Login: React.FC = () => {
                 fill="clear"
                 expand="block"
                 routerLink="/cephaline-supabase/Registration"
-                color="light"
+                color="primary"
               >
-                Don't have an account? Register here
+                Don’t have an account? Register here
               </IonButton>
 
               <AlertBox message={alertMessage} isOpen={showAlert} onClose={() => setShowAlert(false)} />
