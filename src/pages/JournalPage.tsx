@@ -21,7 +21,7 @@ const JournalPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent>
-        <p>Viewing journal entry: {journalId}</p>
+        <p>Viewing journal entry{journalId}</p>
         <PageTitle/>
       </IonContent>
     </IonPage>

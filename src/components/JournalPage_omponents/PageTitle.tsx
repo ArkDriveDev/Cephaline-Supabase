@@ -1,5 +1,3 @@
-// src/components/PageTitle.tsx
-
 import React, { useState } from 'react';
 import { IonInput, IonItem, IonLabel } from '@ionic/react';
 
@@ -7,7 +5,7 @@ const PageTitle: React.FC = () => {
   const [title, setTitle] = useState('');
 
   return (
-    <IonItem>
+    <IonItem lines="none" style={{ width: '700px',margin:'20px',marginTop:'60px'}}>
       <IonInput
         value={title}
         placeholder="Enter page title"
