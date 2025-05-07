@@ -51,7 +51,7 @@ const Spectrum: React.FC = () => {
   const currentMood = getCurrentMood();
 
   return (
-    <IonItem lines="none" style={{ flexDirection: 'column', alignItems: 'flex-start', width: '900px',margin:'20px',marginTop:'10px'}}>
+    <IonItem lines="none" style={{ flexDirection: 'column', alignItems: 'flex-start', width: '900px',margin:'30px',marginBottom:'50px'}}>
       <IonLabel>Mood Spectrum</IonLabel>
       <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
         <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
