@@ -21,33 +21,48 @@ const Profile: React.FC = () => {
 
   const fetchUserProfile = async () => {
     try {
-      // Get the authenticated user (UUID)
+      // Get the authenticated user
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log("Auth user ID:", user?.id); // Debug
-  
+      
       if (!user) {
         setName("Not logged in");
         return;
       }
   
-      // Query using Supabase Auth's `id` (UUID), not `user_id` (SERIAL)
+      // Get user profile data
       const { data, error } = await supabase
         .from('users')
         .select('username, user_firstname, user_lastname, user_avatar_url')
-        .eq('user_email', user.email) // Match by email (or link tables properly)
+        .eq('user_email', user.email)
         .single();
-  
-      console.log("Profile data:", data); // Debug
   
       if (error) throw error;
   
       setName(data.username || "No username");
       setBio(`${data.user_firstname} ${data.user_lastname}`.trim() || "No bio");
-      setProfileImage(data.user_avatar_url || 'https://placehold.co/200');
+      
+      // Handle avatar URL
+      if (data.user_avatar_url) {
+        // If the URL is already a full URL (from previous uploads)
+        if (data.user_avatar_url.startsWith('http')) {
+          setProfileImage(data.user_avatar_url);
+        } 
+        // If it's just a path (new format)
+        else {
+          // Get the public URL from Supabase Storage
+          const { data: { publicUrl } } = await supabase.storage
+            .from('user-avatars')
+            .getPublicUrl(data.user_avatar_url);
+          
+          setProfileImage(publicUrl);
+        }
+      } else {
+        setProfileImage('https://placehold.co/200');
+      }
     } catch (error) {
-      console.error("Error:", error);
-      setName("Error loading name");
-      setBio("Error loading bio");
+      console.error("Error fetching profile:", error);
+      setName("Error loading profile");
+      setBio("Please try again later");
     }
   };
 
@@ -55,7 +70,14 @@ const Profile: React.FC = () => {
     <div style={{ padding: '16px', textAlign: 'center' }}>
       {/* Profile Image */}
       <IonAvatar style={{ width: '200px', height: '200px', margin: '0 auto 16px' }}>
-        <IonImg src={profileImage} style={{ objectFit: 'cover' }} />
+        <IonImg 
+          src={profileImage} 
+          style={{ objectFit: 'cover' }}
+          onError={(e) => {
+            // Fallback if image fails to load
+            (e.target as HTMLImageElement).src = 'https://placehold.co/200';
+          }}
+        />
       </IonAvatar>
 
       {/* Profile Info */}
@@ -65,7 +87,11 @@ const Profile: React.FC = () => {
       </IonLabel>
 
       {/* Edit Button */}
-      <IonButton fill="outline" style={{ marginTop: '16px' }}>
+      <IonButton 
+        fill="outline" 
+        style={{ marginTop: '16px' }}
+        routerLink="/edit-profile" // Link to your edit profile page
+      >
         <IonIcon icon={pencil} slot="start" />
         Edit Profile
       </IonButton>
