@@ -8,6 +8,7 @@ import { useHistory } from 'react-router-dom';
 import AvatarUpload from '../components/editprofile_components/AvatarUpload';
 import PersonalInfoForm from '../components/editprofile_components/PersonalInfoForm';
 import PasswordChangeForm from '../components/editprofile_components/PasswordChangeForm';
+import '../theme/variables.css';
 
 const EditProfile: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -30,7 +31,7 @@ const EditProfile: React.FC = () => {
       if (sessionError || !session || !session.session) {
         setAlertMessage('You must be logged in to access this page.');
         setShowAlert(true);
-        history.push('/it35-lab/login');
+        history.push('/cephaline-supabase/login');
         return;
       }
   
@@ -170,13 +171,14 @@ const EditProfile: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonButtons slot="start">
-          <IonBackButton defaultHref="/it35-lab/app" />
         </IonButtons>
       </IonHeader>
       <IonContent className="ion-padding">
         <IonItem>
-          <IonText color="secondary">
-            <h1>Edit Account</h1>
+          <IonText color="dark">
+          <div style={{ paddingTop: '60px', paddingBottom: '16px' }}>
+    <h1 style={{ color: 'white', textAlign: 'center', marginBottom: '16px' }}>Edit Account</h1>
+  </div>
           </IonText>
         </IonItem>
         <br />
