@@ -30,14 +30,20 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
+      if (file.type.startsWith('image/')) {
+        const imageUrl = URL.createObjectURL(file);
+        setSelectedImage(imageUrl);
+      } else {
+        setSelectedFile(file);
+      }
     }
   };
+
   const handleIconClick = (id: string) => {
     switch (id) {
       case 'link':
@@ -67,10 +73,32 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
 
       onAttach({
         type: 'link',
-        content: formattedUrl
+        content: `[Link](${formattedUrl})`
       });
       setShowLinkModal(false);
       setLinkUrl('');
+    }
+  };
+
+  const handleAttachImage = () => {
+    if (selectedImage) {
+      onAttach({
+        type: 'image',
+        content: `![Image](${selectedImage})`
+      });
+      setSelectedImage(null);
+      setShowImageModal(false);
+    }
+  };
+
+  const handleAttachFile = () => {
+    if (selectedFile) {
+      onAttach({
+        type: 'file',
+        content: `[File: ${selectedFile.name}](${URL.createObjectURL(selectedFile)})`
+      });
+      setSelectedFile(null);
+      setShowFileModal(false);
     }
   };
 
@@ -80,6 +108,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     setShowFileModal(false);
     setShowFolderModal(false);
     setLinkUrl('');
+    setSelectedImage(null);
+    setSelectedFile(null);
   };
 
   return (
@@ -226,7 +256,11 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               )}
             </div>
 
-            <IonButton expand="block" onClick={() => console.log('Attach image functionality')}>
+            <IonButton 
+              expand="block" 
+              onClick={handleAttachImage}
+              disabled={!selectedImage}
+            >
               Attach Image
             </IonButton>
           </div>
@@ -271,37 +305,40 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <IonIcon
-                icon={documentAttachOutline}
-                size="large"
-                style={{ marginBottom: '8px' }}
-              />
-              <p>Drag and drop files here or</p>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                <IonButton
-                  fill="outline"
-                  style={{ marginTop: '8px' }}
-                  onClick={() => console.log('Select document clicked')}
-                >
-                  Documents
-                </IonButton>
-                <IonButton
-                  fill="outline"
-                  style={{ marginTop: '8px' }}
-                  onClick={() => console.log('Select PDF clicked')}
-                >
-                  PDFs
-                </IonButton>
-                <IonButton
-                  fill="outline"
-                  style={{ marginTop: '8px' }}
-                  onClick={() => console.log('Select other file clicked')}
-                >
-                  Other Files
-                </IonButton>
-              </div>
+              {selectedFile ? (
+                <div>
+                  <p>Selected file: {selectedFile.name}</p>
+                  <p>Size: {(selectedFile.size / 1024).toFixed(2)} KB</p>
+                </div>
+              ) : (
+                <>
+                  <IonIcon
+                    icon={documentAttachOutline}
+                    size="large"
+                    style={{ marginBottom: '8px' }}
+                  />
+                  <p>Drag and drop files here or</p>
+                  <IonButton
+                    fill="outline"
+                    style={{ marginTop: '8px' }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Select File
+                  </IonButton>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
+                  />
+                </>
+              )}
             </div>
-            <IonButton expand="block" onClick={() => console.log('Attach file functionality')}>
+            <IonButton 
+              expand="block" 
+              onClick={handleAttachFile}
+              disabled={!selectedFile}
+            >
               Attach File
             </IonButton>
           </div>

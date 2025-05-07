@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { IonCard, IonCardContent, IonTextarea } from '@ionic/react';
 
 interface JournalizedProps {
