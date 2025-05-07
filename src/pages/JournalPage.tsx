@@ -8,23 +8,24 @@ import {
       IonToolbar 
   } from '@ionic/react';
 import PageTitle from '../components/JournalPage_omponents/PageTitle';
+import { useParams } from 'react-router-dom';
+
+const JournalPage: React.FC = () => {
+  const { journalId } = useParams<{ journalId: string }>(); // Remove "string" if you get type errors
   
-  const JournalPage: React.FC = () => {
-    return (
-      <IonPage>
-        <IonHeader>
-          <IonToolbar>
-            <IonButtons slot='start'>
-              <IonMenuButton></IonMenuButton>
-            </IonButtons>
-            <IonTitle>Journalized</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-        <IonContent fullscreen>
-            <PageTitle/>
-        </IonContent>
-      </IonPage>
-    );
-  };
+  return (
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Journal {journalId}</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent>
+        <p>Viewing journal entry: {journalId}</p>
+        <PageTitle/>
+      </IonContent>
+    </IonPage>
+  );
+};
   
   export default JournalPage;

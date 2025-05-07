@@ -55,7 +55,7 @@ const JournalCards: React.FC = () => {
   }
 
   const handleCardClick = (journalId: string) => {
-    history.push(`/Cephaline/Journals/${journalId}`);
+    history.push(`/cephaline-supabase/app/JournalPage/:${journalId}`);
   };
 
   if (loading) {

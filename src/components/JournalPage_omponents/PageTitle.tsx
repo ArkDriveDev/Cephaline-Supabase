@@ -8,7 +8,6 @@ const PageTitle: React.FC = () => {
 
   return (
     <IonItem>
-      <IonLabel position="floating">Page Title</IonLabel>
       <IonInput
         value={title}
         placeholder="Enter page title"
