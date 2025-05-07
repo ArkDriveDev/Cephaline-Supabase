@@ -11,6 +11,7 @@ import PageTitle from '../components/JournalPage_omponents/PageTitle';
 import { useParams } from 'react-router-dom';
 import Spectrum from '../components/JournalPage_omponents/Spectrum';
 import Journalized from '../components/JournalPage_omponents/Journalized';
+import Attachments from '../components/JournalPage_omponents/Attachements';
 
 const JournalPage: React.FC = () => {
   const { journalId } = useParams<{ journalId: string }>(); // Remove "string" if you get type errors
@@ -28,6 +29,7 @@ const JournalPage: React.FC = () => {
         <h1  style={{margin:'30px',marginTop:'80px'}}>How are you feeling for these Journal?</h1>
         <Spectrum/>
         <Journalized/>
+        <Attachments/>
       </IonContent>
     </IonPage>
   );
