@@ -16,7 +16,7 @@ import {
   IonSelectOption,
   IonAlert
 } from '@ionic/react';
-import { bookOutline, close, colorPalette } from 'ionicons/icons';
+import { bookOutline, close} from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
 
 interface NewJournalData {
