@@ -20,6 +20,7 @@ const Attachments: React.FC = () => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
+  const [showFolderModal, setShowFolderModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
   const handleIconClick = (id: string) => {
@@ -34,7 +35,7 @@ const Attachments: React.FC = () => {
         setShowFileModal(true);
         break;
       case 'folder':
-        console.log('Folder attachment clicked');
+        setShowFolderModal(true);
         break;
       default:
         break;
@@ -51,6 +52,7 @@ const Attachments: React.FC = () => {
     setShowLinkModal(false);
     setShowImageModal(false);
     setShowFileModal(false);
+    setShowFolderModal(false);
     setLinkUrl('');
   };
 
@@ -256,6 +258,65 @@ const Attachments: React.FC = () => {
             </div>
             <IonButton expand="block" onClick={() => console.log('Attach file functionality')}>
               Attach File
+            </IonButton>
+          </div>
+        </IonContent>
+      </IonModal>
+
+      {/* Folder Modal */}
+      <IonModal
+        isOpen={showFolderModal}
+        onDidDismiss={handleCloseModal}
+        style={{
+          '--height': '50%',
+          '--border-radius': '16px',
+          '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
+        }}
+      >
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Attach Folder</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={handleCloseModal}>
+                <IonIcon icon={closeOutline} />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100%',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ 
+              border: '2px dashed #ccc',
+              borderRadius: '8px',
+              padding: '20px',
+              textAlign: 'center',
+              marginBottom: '16px',
+              flexGrow: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <IonIcon 
+                icon={folderOpenOutline} 
+                size="large" 
+                style={{ marginBottom: '8px' }} 
+              />
+              <p>Drag and drop folders here or</p>
+              <IonButton 
+                fill="outline" 
+                style={{ marginTop: '8px' }}
+                onClick={() => console.log('Select folder clicked')}
+              >
+                Select Folder
+              </IonButton>
+            </div>
+            <IonButton expand="block" onClick={() => console.log('Attach folder functionality')}>
+              Attach Folder
             </IonButton>
           </div>
         </IonContent>
