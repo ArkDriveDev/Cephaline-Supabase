@@ -118,7 +118,7 @@ const Login: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle style={{ textAlign: 'center' }}>Cephaline Coding Journal App</IonTitle>
+          <IonTitle style={{ textAlign: 'left' }}>Cephaline Coding Journal App</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -181,7 +181,7 @@ const Login: React.FC = () => {
                 message="Login successful! Redirecting..."
                 duration={1500}
                 position="top"
-                color="success"
+                color="primary"
               />
             </IonCardContent>
           </IonCard>
