@@ -20,6 +20,7 @@ import EditProfile from './EditProfile';
 import JournalPage from './JournalPage';
 import Overviewing from './Overviewing';
 import PageList from './PageList';
+import JournalPageView from './JournalPageView';
 const Menu: React.FC = () => {
   const path = [
     { name: 'Home', url: '/cephaline-supabase/app/home', icon: homeOutline },
@@ -91,6 +92,7 @@ const Menu: React.FC = () => {
           <Route exact path="/cephaline-supabase/app/editProfile" component={EditProfile} />
           <Route exact path="/cephaline-supabase/app/JournalPage/:journalId?" component={JournalPage} />
           <Route exact path="/cephaline-supabase/app/page-list/:journalId" component={PageList} />
+          <Route exact path="/cephaline-supabase/app/JournalPageView/:journalId/:pageId" component={JournalPageView} />
           <Route
             exact
             path="/cephaline-supabase/app/Overviewing/:journalId"

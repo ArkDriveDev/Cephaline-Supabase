@@ -1,0 +1,70 @@
+.journal-page-content {
+    --background: #f9f5e9; /* Parchment-like background */
+  }
+  
+  .journal-page-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    min-height: 100%;
+  }
+  
+  .journal-page-header {
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .journal-page-header h1 {
+    font-size: 1.8rem;
+    margin: 0 0 10px 0;
+    color: #333;
+  }
+  
+  .mood-badge {
+    display: inline-block;
+    background-color: #e3f2fd;
+    color: #1976d2;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-left: 10px;
+  }
+  
+  .page-metadata {
+    margin-top: 8px;
+    color: #666;
+  }
+  
+  .journal-page-text {
+    line-height: 1.6;
+    font-size: 1.1rem;
+    padding: 10px 0;
+  }
+  
+  .journal-page-text p {
+    margin: 0 0 1em 0;
+  }
+  
+  .empty-content {
+    color: #999;
+    font-style: italic;
+  }
+  
+  .page-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+  }
+  
+  /* Add some paper-like texture */
+  .journal-page-container {
+    background-image: linear-gradient(#f9f5e9 0.1em, transparent 0.1em);
+    background-size: 100% 1.2em;
+    line-height: 1.2em;
+    padding-bottom: 2em;
+  }
