@@ -1,0 +1,81 @@
+.journal-grid-container {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 2000px;
+    margin-right: auto;
+    margin-left: 0;
+  }
+  
+  .journal-row {
+    display: flex;
+    gap: 20px;
+    position: relative;
+    /* Add these to prevent row stretching */
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .journal-card-wrapper {
+    position: relative;
+    transition: transform 0.2s ease;
+    width: calc((100% - 40px) / 3); /* Subtract gap space */
+    min-width: 250px; /* Minimum card width */
+  }
+  
+  /* Keep all other styles the same */
+  .journal-card {
+    margin: 0;
+    border-radius: 0 8px 8px 0;
+    border-left: 4px solid var(--ion-color-primary, #3880ff);
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    height: 100%;
+  }
+  
+  
+  .journal-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--ion-color-primary, #3880ff);
+    padding-left: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .journal-content {
+    padding-top: 0;
+    padding-left: 10px;
+    border-top: 1px solid #eee;
+    height: calc(100% - 50px); /* Adjust based on your header height */
+  }
+  
+  .journal-description {
+    margin: 8px 0;
+    color: #555;
+    font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* Limit description lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .journal-date {
+    color: #888;
+    display: block;
+    text-align: right;
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+  }
+  
+  .journal-spine {
+    position: absolute;
+    left: -8px;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    background-color: #2a65d0;
+    border-radius: 4px 0 0 4px;
+  }
