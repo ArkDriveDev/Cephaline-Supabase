@@ -1,39 +1,27 @@
 import React from 'react';
-import { IonButton, IonIcon, useIonRouter, useIonToast } from '@ionic/react';
-import { saveOutline } from 'ionicons/icons';
+import { IonButton, IonSpinner } from '@ionic/react';
 
 interface SavePageProps {
-  onSave: () => Promise<void>;
-  disabled?: boolean;
+  onSave: () => void;
+  disabled: boolean;
+  loading: boolean;  // Add this prop
 }
 
-const SavePage: React.FC<SavePageProps> = ({ onSave, disabled = false }) => {
-  const [present] = useIonToast();
-  const router = useIonRouter();
-
-  const handleSave = async () => {
-    try {
-      await onSave();
-      await present({
-        message: 'Journal saved successfully!',
-        duration: 2000,
-        color: 'success'
-      });
-      router.push('/cephaline-supabase/app/home');
-    } catch (error) {
-      await present({
-        message: 'Failed to save journal. Please try again.',
-        duration: 3000,
-        color: 'danger'
-      });
-      console.error('Error saving page:', error);
-    }
-  };
-
+const SavePage: React.FC<SavePageProps> = ({ onSave, disabled, loading }) => {
   return (
-    <IonButton onClick={handleSave} disabled={disabled}>
-      <IonIcon icon={saveOutline} slot="start" />
-      Save Page
+    <IonButton 
+      onClick={onSave} 
+      disabled={disabled || loading}
+      expand="block"
+    >
+      {loading ? (
+        <>
+          <IonSpinner name="crescent" />
+          Saving...
+        </>
+      ) : (
+        'Save Page'
+      )}
     </IonButton>
   );
 };
