@@ -2,11 +2,23 @@ import React, { useState } from 'react';
 import { IonRange, IonItem, IonLabel, IonIcon } from '@ionic/react';
 import { happy, sad, heart, removeCircle, alertCircle } from 'ionicons/icons';
 
-const Spectrum: React.FC = () => {
+interface SpectrumProps {
+  onMoodChange: (mood: string) => void;
+}
+
+interface MoodLevel {
+  level: string;
+  min: number;
+  max: number;
+  color: string;
+  icon: any;
+}
+
+const Spectrum: React.FC<SpectrumProps> = ({ onMoodChange }) => {
   const [mood, setMood] = useState(50); // 0-100 scale
 
   // Mood level configuration
-  const moodLevels = [
+  const moodLevels: MoodLevel[] = [
     { 
       level: 'Angry', 
       min: 0, 
@@ -44,30 +56,64 @@ const Spectrum: React.FC = () => {
     }
   ];
 
-  const getCurrentMood = () => {
+  const getCurrentMood = (): MoodLevel => {
     return moodLevels.find(level => mood >= level.min && mood <= level.max) || moodLevels[2];
   };
 
   const currentMood = getCurrentMood();
 
+  // Call onMoodChange whenever the mood updates
+  const handleMoodChange = (value: number) => {
+    setMood(value);
+    const moodLevel = getCurrentMood().level;
+    onMoodChange(moodLevel);
+  };
+
   return (
-    <IonItem lines="none" style={{ flexDirection: 'column', alignItems: 'flex-start', width: '900px',margin:'30px',marginBottom:'50px'}}>
+    <IonItem 
+      lines="none" 
+      style={{ 
+        flexDirection: 'column', 
+        alignItems: 'flex-start', 
+        width: '900px', 
+        margin: '30px', 
+        marginBottom: '50px'
+      }}
+    >
       <IonLabel>Mood Spectrum</IonLabel>
       <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-        <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
+        <IonIcon 
+          icon={currentMood.icon} 
+          style={{ 
+            color: currentMood.color,
+            fontSize: '24px',
+            marginRight: '12px'
+          }} 
+        />
         <IonRange
           min={0}
           max={100}
+          pin={true}
+          snaps={true}
           value={mood}
-          onIonChange={(e) => setMood(e.detail.value as number)}
+          onIonChange={(e) => handleMoodChange(e.detail.value as number)}
           style={{ 
             flex: 1, 
             margin: '0 12px',
             '--bar-background': `linear-gradient(to right, 
-              ${moodLevels.map(level => `${level.color} ${level.min}%, ${level.color} ${level.max}%`).join(', ')}`
+              ${moodLevels.map(level => `${level.color} ${level.min}%, ${level.color} ${level.max}%`).join(', ')})`,
+            '--bar-height': '8px',
+            '--knob-size': '20px'
           }}
         />
-        <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
+        <IonIcon 
+          icon={currentMood.icon} 
+          style={{ 
+            color: currentMood.color,
+            fontSize: '24px',
+            marginLeft: '12px'
+          }} 
+        />
       </div>
       <div style={{ 
         display: 'flex', 
@@ -76,18 +122,42 @@ const Spectrum: React.FC = () => {
         marginTop: '8px'
       }}>
         {moodLevels.map(level => (
-          <div key={level.level} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <IonIcon icon={level.icon} style={{ color: level.color, fontSize: '16px' }} />
-            <span style={{ fontSize: '10px', marginTop: '4px' }}>{level.level}</span>
+          <div 
+            key={level.level} 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center',
+              width: `${100/moodLevels.length}%`
+            }}
+          >
+            <IonIcon 
+              icon={level.icon} 
+              style={{ 
+                color: level.color, 
+                fontSize: '20px',
+                opacity: currentMood.level === level.level ? 1 : 0.6
+              }} 
+            />
+            <span style={{ 
+              fontSize: '12px', 
+              marginTop: '4px',
+              color: level.color,
+              fontWeight: currentMood.level === level.level ? 'bold' : 'normal'
+            }}>
+              {level.level}
+            </span>
           </div>
         ))}
       </div>
       <IonLabel style={{ 
-        fontSize: '14px', 
-        marginTop: '12px',
-        margin:'10px',
+        fontSize: '16px', 
+        marginTop: '16px',
+        marginLeft: '10px',
         color: currentMood.color,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        textAlign: 'center',
+        width: '100%'
       }}>
         Current Mood: {currentMood.level}
       </IonLabel>
