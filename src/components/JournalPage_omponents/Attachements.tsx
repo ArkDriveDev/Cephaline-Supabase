@@ -15,7 +15,12 @@ const icons = [
   { id: 'folder', icon: folderOpenOutline, label: 'Attach Folder' }
 ];
 
-const Attachments: React.FC = () => {
+interface Attachment {
+  type: string;
+  content: string;
+}
+
+const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({ onAttach }) => {
   const [hovered, setHovered] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -43,9 +48,20 @@ const Attachments: React.FC = () => {
   };
 
   const handleSubmitLink = () => {
-    console.log('Submitted link:', linkUrl);
-    setShowLinkModal(false);
-    setLinkUrl('');
+    if (linkUrl.trim()) {
+      // Add http:// if not present
+      let formattedUrl = linkUrl;
+      if (!/^https?:\/\//i.test(linkUrl)) {
+        formattedUrl = 'http://' + linkUrl;
+      }
+      
+      onAttach({
+        type: 'link',
+        content: formattedUrl
+      });
+      setShowLinkModal(false);
+      setLinkUrl('');
+    }
   };
 
   const handleCloseModal = () => {
@@ -119,7 +135,7 @@ const Attachments: React.FC = () => {
         <IonContent className="ion-padding">
           <IonInput
             value={linkUrl}
-            placeholder="Enter URL"
+            placeholder="Enter URL (e.g., example.com)"
             onIonChange={(e) => setLinkUrl(e.detail.value!)}
             style={{ marginBottom: '16px' }}
           />
