@@ -29,7 +29,15 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   const [linkUrl, setLinkUrl] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setSelectedImage(imageUrl);
+    }
+  };
   const handleIconClick = (id: string) => {
     switch (id) {
       case 'link':
@@ -183,35 +191,39 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexGrow: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              alignItems: 'center'
             }}>
-              <IonIcon
-                icon={imageOutline}
-                size="large"
-                style={{ marginBottom: '8px' }}
-              />
-              <p>Drag and drop images here or</p>
-              <IonButton
-                fill="outline"
-                style={{ marginTop: '8px' }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Select from device
-              </IonButton>
-
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    console.log('Selected image:', file);
-                    // You can now set state, preview image, etc.
-                  }
-                }}
-              />
+              {selectedImage ? (
+                <img
+                  src={selectedImage}
+                  alt="Preview"
+                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }}
+                />
+              ) : (
+                <>
+                  <IonIcon
+                    icon={imageOutline}
+                    size="large"
+                    style={{ marginBottom: '8px' }}
+                  />
+                  <p>Drag and drop images here or</p>
+                  <IonButton
+                    fill="outline"
+                    style={{ marginTop: '8px' }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Select from device
+                  </IonButton>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
+                  />
+                </>
+              )}
             </div>
 
             <IonButton expand="block" onClick={() => console.log('Attach image functionality')}>
