@@ -82,7 +82,7 @@ const PageList: React.FC = () => {
             {pages.map((page) => (
               <IonItem 
                 key={page.page_id} 
-                routerLink={`/cephaline-supabase/app/JournalPage/${journalId}/${page.page_id}`}
+                routerLink={`/cephaline-supabase/app/JournalPageView/${journalId}/${page.page_id}`} // Updated to use JournalPageView
                 detail
               >
                 <IonLabel>
