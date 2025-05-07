@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IonRange, IonItem, IonLabel, IonIcon } from '@ionic/react';
 import { happy, sad, heart, removeCircle, alertCircle } from 'ionicons/icons';
 
 interface SpectrumProps {
   onMoodChange: (mood: string) => void;
+  currentMood?: string;
 }
 
 interface MoodLevel {
@@ -14,47 +15,36 @@ interface MoodLevel {
   icon: any;
 }
 
-const Spectrum: React.FC<SpectrumProps> = ({ onMoodChange }) => {
-  const [mood, setMood] = useState(50); // 0-100 scale
-
+const Spectrum: React.FC<SpectrumProps> = ({ onMoodChange, currentMood: initialMoodName }) => {
   // Mood level configuration
   const moodLevels: MoodLevel[] = [
-    { 
-      level: 'Angry', 
-      min: 0, 
-      max: 20, 
-      color: '#F44336', 
-      icon: alertCircle 
-    },
-    { 
-      level: 'Sad', 
-      min: 20, 
-      max: 40, 
-      color: '#FF9800', 
-      icon: sad 
-    },
-    { 
-      level: 'Neutral', 
-      min: 40, 
-      max: 60, 
-      color: '#FFC107', 
-      icon: removeCircle 
-    },
-    { 
-      level: 'Happy', 
-      min: 60, 
-      max: 80, 
-      color: '#8BC34A', 
-      icon: happy 
-    },
-    { 
-      level: 'Super Happy', 
-      min: 80, 
-      max: 100, 
-      color: '#4CAF50', 
-      icon: heart 
-    }
+    { level: 'Angry', min: 0, max: 20, color: '#F44336', icon: alertCircle },
+    { level: 'Sad', min: 20, max: 40, color: '#FF9800', icon: sad },
+    { level: 'Neutral', min: 40, max: 60, color: '#FFC107', icon: removeCircle },
+    { level: 'Happy', min: 60, max: 80, color: '#8BC34A', icon: happy },
+    { level: 'Super Happy', min: 80, max: 100, color: '#4CAF50', icon: heart }
   ];
+
+  // Initialize with prop value or default to Neutral (50)
+  const getInitialMoodValue = () => {
+    if (initialMoodName) {
+      const level = moodLevels.find(l => l.level === initialMoodName);
+      return level ? level.min + 10 : 50;
+    }
+    return 50;
+  };
+
+  const [mood, setMood] = useState(getInitialMoodValue());
+
+  // Update internal state if prop changes
+  useEffect(() => {
+    if (initialMoodName) {
+      const level = moodLevels.find(l => l.level === initialMoodName);
+      if (level) {
+        setMood(level.min + 10);
+      }
+    }
+  }, [initialMoodName]);
 
   const getCurrentMood = (): MoodLevel => {
     return moodLevels.find(level => mood >= level.min && mood <= level.max) || moodLevels[2];
@@ -62,7 +52,6 @@ const Spectrum: React.FC<SpectrumProps> = ({ onMoodChange }) => {
 
   const currentMood = getCurrentMood();
 
-  // Call onMoodChange whenever the mood updates
   const handleMoodChange = (value: number) => {
     setMood(value);
     const moodLevel = getCurrentMood().level;
