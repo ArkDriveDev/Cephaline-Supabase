@@ -1,14 +1,18 @@
 import React, { useState, useRef } from 'react';
-import { IonIcon, IonRow, IonCol, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInput, IonButtons } from '@ionic/react';
+import { 
+  IonIcon, IonRow, IonCol, IonModal, IonHeader, IonToolbar, 
+  IonTitle, IonContent, IonButton, IonInput, IonButtons, 
+  IonItem, IonLabel, IonThumbnail, IonText 
+} from '@ionic/react';
 import {
   linkOutline,
   imageOutline,
   documentAttachOutline,
   folderOpenOutline,
-  closeOutline
+  closeOutline,
+  documentTextOutline
 } from 'ionicons/icons';
 
-// Add this type declaration (usually in a separate types.d.ts file)
 declare module 'react' {
   interface InputHTMLAttributes<T> {
     webkitdirectory?: string | boolean;
@@ -20,12 +24,12 @@ declare module 'react' {
 const icons = [
   { id: 'link', icon: linkOutline, label: 'Attach Link' },
   { id: 'image', icon: imageOutline, label: 'Attach Image' },
-  { id: 'file', icon: documentAttachOutline, label: 'Attach Document' },
+  { id: 'file', icon: documentAttachOutline, label: 'Attach File' },
   { id: 'folder', icon: folderOpenOutline, label: 'Attach Folder' }
 ];
 
 interface Attachment {
-  type: string;
+  type: 'link' | 'image' | 'file' | 'folder';
   content: string;
   file?: File;
   files?: File[];
@@ -45,7 +49,6 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFolderFiles, setSelectedFolderFiles] = useState<File[]>([]);
 
-  // Allowed document file types
   const allowedFileTypes = [
     'application/pdf',
     'application/msword',
@@ -106,7 +109,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
 
       onAttach({
         type: 'link',
-        content: `[Link](${formattedUrl})`
+        content: `[${formattedUrl}](${formattedUrl})` // Markdown format
       });
       setShowLinkModal(false);
       setLinkUrl('');
@@ -117,7 +120,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     if (selectedImage) {
       onAttach({
         type: 'image',
-        content: `![Image](${selectedImage})`
+        content: `![Image](${selectedImage})` // Markdown format
       });
       setSelectedImage(null);
       setShowImageModal(false);
@@ -128,7 +131,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     if (selectedFile) {
       onAttach({
         type: 'file',
-        content: `[Document: ${selectedFile.name}]`,
+        content: `[File: ${selectedFile.name}]`, // Markdown format
         file: selectedFile
       });
       setSelectedFile(null);
@@ -143,7 +146,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       
       onAttach({
         type: 'folder',
-        content: `[Folder: ${folderName}]`,
+        content: `[Folder: ${folderName}]`, // Markdown format
         files: selectedFolderFiles
       });
       setSelectedFolderFiles([]);
@@ -166,26 +169,24 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     const extension = fileName.split('.').pop()?.toLowerCase();
     switch (extension) {
       case 'pdf':
-        return 'assets/icon/pdf-icon.png';
+        return <IonIcon icon={documentTextOutline} color="danger" />;
       case 'doc':
       case 'docx':
-        return 'assets/icon/word-icon.png';
+        return <IonIcon icon={documentTextOutline} color="primary" />;
       case 'xls':
       case 'xlsx':
-        return 'assets/icon/excel-icon.png';
+        return <IonIcon icon={documentTextOutline} color="success" />;
       case 'ppt':
       case 'pptx':
-        return 'assets/icon/powerpoint-icon.png';
-      case 'txt':
-        return 'assets/icon/text-icon.png';
+        return <IonIcon icon={documentTextOutline} color="warning" />;
       default:
-        return 'assets/icon/file-icon.png';
+        return <IonIcon icon={documentTextOutline} />;
     }
   };
 
   return (
     <>
-      <IonRow style={{ justifyContent: 'flex-start', gap: '1px', padding: '8px' }}>
+      <IonRow style={{ justifyContent: 'flex-start', gap: '8px', padding: '8px' }}>
         {icons.map(({ id, icon, label }) => (
           <IonCol size="auto" key={id}>
             <div
@@ -197,7 +198,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                 icon={icon}
                 size="large"
                 onClick={() => handleIconClick(id)}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', padding: '4px' }}
               />
               {hovered === id && (
                 <div
@@ -224,15 +225,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       </IonRow>
 
       {/* Link Modal */}
-      <IonModal
-        isOpen={showLinkModal}
-        onDidDismiss={handleCloseModal}
-        style={{
-          '--height': '25%',
-          '--border-radius': '16px',
-          '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
-        }}
-      >
+      <IonModal isOpen={showLinkModal} onDidDismiss={handleCloseModal}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Attach Link</IonTitle>
@@ -251,21 +244,13 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
             style={{ marginBottom: '16px' }}
           />
           <IonButton expand="block" onClick={handleSubmitLink}>
-            Attach
+            Attach Link
           </IonButton>
         </IonContent>
       </IonModal>
 
       {/* Image Modal */}
-      <IonModal
-        isOpen={showImageModal}
-        onDidDismiss={handleCloseModal}
-        style={{
-          '--height': '40%',
-          '--border-radius': '16px',
-          '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
-        }}
-      >
+      <IonModal isOpen={showImageModal} onDidDismiss={handleCloseModal}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Attach Image</IonTitle>
@@ -277,14 +262,9 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            justifyContent: 'space-between'
-          }}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{
-              border: '2px dashed #ccc',
+              border: '2px dashed var(--ion-color-medium)',
               borderRadius: '8px',
               padding: '20px',
               textAlign: 'center',
@@ -293,7 +273,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              alignItems: 'center'
+              alignItems: 'center',
+              minHeight: '200px'
             }}>
               {selectedImage ? (
                 <img
@@ -306,15 +287,17 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                   <IonIcon
                     icon={imageOutline}
                     size="large"
-                    style={{ marginBottom: '8px' }}
+                    style={{ marginBottom: '8px', color: 'var(--ion-color-medium)' }}
                   />
-                  <p>Drag and drop images here or</p>
+                  <IonText color="medium">
+                    <p>Drag and drop images here or</p>
+                  </IonText>
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    Select from device
+                    Select Image
                   </IonButton>
                   <input
                     type="file"
@@ -326,7 +309,6 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                 </>
               )}
             </div>
-
             <IonButton 
               expand="block" 
               onClick={handleAttachImage}
@@ -339,15 +321,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       </IonModal>
 
       {/* File Modal */}
-      <IonModal
-        isOpen={showFileModal}
-        onDidDismiss={handleCloseModal}
-        style={{
-          '--height': '50%',
-          '--border-radius': '16px',
-          '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
-        }}
-      >
+      <IonModal isOpen={showFileModal} onDidDismiss={handleCloseModal}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Attach Document</IonTitle>
@@ -359,14 +333,9 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            justifyContent: 'space-between'
-          }}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{
-              border: '2px dashed #ccc',
+              border: '2px dashed var(--ion-color-medium)',
               borderRadius: '8px',
               padding: '20px',
               textAlign: 'center',
@@ -375,26 +344,29 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              alignItems: 'center'
+              alignItems: 'center',
+              minHeight: '200px'
             }}>
               {selectedFile ? (
-                <div style={{ textAlign: 'center' }}>
-                  <img 
-                    src={getFileIcon(selectedFile.name)} 
-                    alt="File type" 
-                    style={{ width: '64px', height: '64px', marginBottom: '16px' }}
-                  />
-                  <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{selectedFile.name}</p>
-                  <p style={{ color: '#666' }}>{(selectedFile.size / 1024).toFixed(2)} KB</p>
-                </div>
+                <IonItem lines="none" style={{ width: '100%' }}>
+                  <IonThumbnail slot="start">
+                    {getFileIcon(selectedFile.name)}
+                  </IonThumbnail>
+                  <IonLabel>
+                    <h3>{selectedFile.name}</h3>
+                    <p>{(selectedFile.size / 1024).toFixed(2)} KB</p>
+                  </IonLabel>
+                </IonItem>
               ) : (
                 <>
                   <IonIcon
                     icon={documentAttachOutline}
                     size="large"
-                    style={{ marginBottom: '8px' }}
+                    style={{ marginBottom: '8px', color: 'var(--ion-color-medium)' }}
                   />
-                  <p>Drag and drop documents here or</p>
+                  <IonText color="medium">
+                    <p>Drag and drop documents here or</p>
+                  </IonText>
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}
@@ -424,15 +396,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       </IonModal>
 
       {/* Folder Modal */}
-      <IonModal
-        isOpen={showFolderModal}
-        onDidDismiss={handleCloseModal}
-        style={{
-          '--height': '50%',
-          '--border-radius': '16px',
-          '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
-        }}
-      >
+      <IonModal isOpen={showFolderModal} onDidDismiss={handleCloseModal}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Attach Folder</IonTitle>
@@ -444,14 +408,9 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            justifyContent: 'space-between'
-          }}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{
-              border: '2px dashed #ccc',
+              border: '2px dashed var(--ion-color-medium)',
               borderRadius: '8px',
               padding: '20px',
               textAlign: 'center',
@@ -461,29 +420,31 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexDirection: 'column',
               justifyContent: selectedFolderFiles.length > 0 ? 'flex-start' : 'center',
               alignItems: 'center',
+              minHeight: '200px',
               overflowY: 'auto'
             }}>
               {selectedFolderFiles.length > 0 ? (
-                <div style={{ width: '100%', textAlign: 'left' }}>
-                  <p style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-                    {selectedFolderFiles[0].webkitRelativePath.split('/')[0]} ({selectedFolderFiles.length} files)
-                  </p>
+                <div style={{ width: '100%' }}>
+                  <IonText>
+                    <h3 style={{ marginBottom: '16px' }}>
+                      {selectedFolderFiles[0].webkitRelativePath.split('/')[0]} 
+                      <span style={{ color: 'var(--ion-color-medium)' }}> ({selectedFolderFiles.length} files)</span>
+                    </h3>
+                  </IonText>
                   <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                     {selectedFolderFiles.map((file, index) => (
-                      <div key={index} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        padding: '4px 0',
-                        borderBottom: '1px solid #eee'
-                      }}>
+                      <IonItem key={index} lines="none">
                         <IonIcon 
                           icon={documentAttachOutline} 
-                          style={{ marginRight: '8px', color: '#666' }} 
+                          slot="start"
+                          color="medium"
                         />
-                        <span style={{ fontSize: '14px' }}>
-                          {file.webkitRelativePath.split('/').slice(1).join('/')}
-                        </span>
-                      </div>
+                        <IonLabel>
+                          <p style={{ fontSize: '14px' }}>
+                            {file.webkitRelativePath.split('/').slice(1).join('/')}
+                          </p>
+                        </IonLabel>
+                      </IonItem>
                     ))}
                   </div>
                 </div>
@@ -492,9 +453,11 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                   <IonIcon
                     icon={folderOpenOutline}
                     size="large"
-                    style={{ marginBottom: '8px' }}
+                    style={{ marginBottom: '8px', color: 'var(--ion-color-medium)' }}
                   />
-                  <p>Drag and drop folders here or</p>
+                  <IonText color="medium">
+                    <p>Drag and drop folders here or</p>
+                  </IonText>
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}

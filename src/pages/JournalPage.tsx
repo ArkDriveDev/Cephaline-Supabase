@@ -8,63 +8,96 @@ import {
   IonButtons,
   IonBackButton,
   useIonToast,
-  IonLabel,
   IonItem,
-  IonRange,
-  IonIcon
+  IonInput,
+  IonCard,
+  IonCardContent
 } from '@ionic/react';
 import { useParams } from 'react-router-dom';
-import { happy, sad, heart, removeCircle, alertCircle } from 'ionicons/icons';
-import PageTitle from '../components/JournalPage_omponents/PageTitle';
+import { supabase } from '../utils/supaBaseClient';
 import Journalized from '../components/JournalPage_omponents/Journalized';
 import Attachments from '../components/JournalPage_omponents/Attachements';
 import SavePage from '../components/JournalPage_omponents/SavePage';
-import { supabase } from '../utils/supaBaseClient';
+import Spectrum from '../components/JournalPage_omponents/Spectrum';
 
-interface MoodLevel {
-  level: string;
-  min: number;
-  max: number;
-  color: string;
-  icon: string;
+
+interface JournalBlock {
+  type: 'paragraph' | 'link' | 'image' | 'file' | 'folder';
+  content: string;
 }
 
 const JournalPage: React.FC = () => {
-  let { journalId } = useParams<{ journalId: string }>();
-  journalId = journalId.replace(/^:/, ''); 
-  const [entry, setEntry] = useState('');
+  const { journalId: rawJournalId } = useParams<{ journalId: string }>();
+  const journalId = rawJournalId?.startsWith(':') ? rawJournalId.slice(1) : rawJournalId;
+  
+  const [markdownContent, setMarkdownContent] = useState('');
   const [pageTitle, setPageTitle] = useState('');
-  const [moodValue, setMoodValue] = useState(50);
   const [isSaving, setIsSaving] = useState(false);
   const [present] = useIonToast();
 
-  const moodLevels: MoodLevel[] = [
-    { level: 'Angry', min: 0, max: 20, color: '#F44336', icon: alertCircle },
-    { level: 'Sad', min: 20, max: 40, color: '#FF9800', icon: sad },
-    { level: 'Neutral', min: 40, max: 60, color: '#FFC107', icon: removeCircle },
-    { level: 'Happy', min: 60, max: 80, color: '#8BC34A', icon: happy },
-    { level: 'Super Happy', min: 80, max: 100, color: '#4CAF50', icon: heart }
-  ];
-
-  const getCurrentMood = (): MoodLevel => {
-    return moodLevels.find(level => moodValue >= level.min && moodValue <= level.max) || moodLevels[2];
+  const handleAddAttachment = (attachment: { type: string; content: string }) => {
+    let formattedContent = '';
+    switch(attachment.type) {
+      case 'image':
+        formattedContent = `\n![${attachment.content.split('/').pop()}](${attachment.content})\n`;
+        break;
+      case 'file':
+        formattedContent = `\n[file: ${attachment.content.split('/').pop()}](${attachment.content})\n`;
+        break;
+      case 'folder':
+        formattedContent = `\n[folder: ${attachment.content.split('/').pop()}](${attachment.content})\n`;
+        break;
+      default:
+        formattedContent = `\n${attachment.content}\n`;
+    }
+    setMarkdownContent(prev => prev + formattedContent);
   };
 
-  const currentMood = getCurrentMood();
+  const parseContent = (markdown: string): JournalBlock[] => {
+    const blocks: JournalBlock[] = [];
+    const lines = markdown.split('\n');
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      // Image detection (markdown format)
+      const imageMatch = line.match(/!\[(.*?)\]\((.*?)\)/);
+      if (imageMatch) {
+        blocks.push({ type: 'image', content: imageMatch[2] });
+        continue;
+      }
+
+      // File detection (custom format)
+      const fileMatch = line.match(/\[file: (.*?)\]\((.*?)\)/);
+      if (fileMatch) {
+        blocks.push({ type: 'file', content: fileMatch[2] });
+        continue;
+      }
+
+      // Folder detection (custom format)
+      const folderMatch = line.match(/\[folder: (.*?)\]\((.*?)\)/);
+      if (folderMatch) {
+        blocks.push({ type: 'folder', content: folderMatch[2] });
+        continue;
+      }
+
+      // Regular link detection (markdown format)
+      const linkMatch = line.match(/\[(.*?)\]\((.*?)\)/);
+      if (linkMatch && !line.includes('file:') && !line.includes('folder:')) {
+        blocks.push({ type: 'link', content: linkMatch[2] });
+        continue;
+      }
+
+      // Default to paragraph
+      blocks.push({ type: 'paragraph', content: line });
+    }
+
+    return blocks;
+  };
 
   const validateInputs = (): boolean => {
-    if (!journalId) {
-      present({ message: 'No journal ID provided', duration: 2000, color: 'danger' });
-      return false;
-    }
-
-    if (!entry.trim()) {
-      present({ message: 'Entry cannot be empty', duration: 2000, color: 'warning' });
-      return false;
-    }
-
-    if (entry.length > 10000) {
-      present({ message: 'Entry is too long (max 10,000 characters)', duration: 2000, color: 'warning' });
+    if (!journalId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(journalId)) {
+      present({ message: 'Invalid journal selected', duration: 2000, color: 'danger' });
       return false;
     }
 
@@ -78,6 +111,11 @@ const JournalPage: React.FC = () => {
       return false;
     }
 
+    if (!markdownContent.trim()) {
+      present({ message: 'Journal content cannot be empty', duration: 2000, color: 'warning' });
+      return false;
+    }
+
     return true;
   };
 
@@ -87,6 +125,7 @@ const JournalPage: React.FC = () => {
     setIsSaving(true);
 
     try {
+      // Get last page number
       const { data: lastPage, error: pageError } = await supabase
         .from('journal_pages')
         .select('page_no')
@@ -97,57 +136,48 @@ const JournalPage: React.FC = () => {
       if (pageError) throw pageError;
       const nextPageNo = lastPage?.[0]?.page_no ? lastPage[0].page_no + 1 : 1;
 
+      // Create new page
       const { data: newPage, error: insertError } = await supabase
         .from('journal_pages')
         .insert({
           journal_id: journalId,
           page_title: pageTitle.trim(),
-          mood: currentMood.level,
-          page_no: nextPageNo
+          page_no: nextPageNo,
         })
         .select()
         .single();
 
       if (insertError) throw insertError;
 
+      // Parse and insert content
+      const contentBlocks = parseContent(markdownContent);
+      const contentInserts = contentBlocks.map((block, index) => ({
+        page_id: newPage.page_id,
+        content_order: index + 1,
+        paragraph: block.type === 'paragraph' ? block.content : null,
+        link: block.type === 'link' ? block.content : null,
+        image_url: block.type === 'image' ? block.content : null,
+        file_url: block.type === 'file' ? block.content : null,
+        folder_name: block.type === 'folder' ? block.content : null,
+      }));
+
       const { error: contentError } = await supabase
         .from('journal_page_contents')
-        .insert({
-          page_id: newPage.page_id,
-          content_order: 1,
-          paragraph: entry.trim()
-        });
+        .insert(contentInserts);
 
       if (contentError) throw contentError;
 
-      present({
-        message: 'Journal page saved successfully!',
-        duration: 2000,
-        color: 'success'
-      });
+      present({ message: 'Journal page saved successfully!', duration: 2000, color: 'success' });
 
-      setEntry('');
+      // Reset form
+      setMarkdownContent('');
       setPageTitle('');
-      setMoodValue(50);
     } catch (error: any) {
-      console.error('Full error details:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-
-      let errorMessage = 'Failed to save journal page';
-      if (error.code === '23503') {
-        errorMessage = 'Invalid journal reference';
-      } else if (error.code === '23505') {
-        errorMessage = 'Page number already exists';
-      }
-
+      console.error('Save error:', error);
       present({
-        message: `${errorMessage}: ${error.details || error.message}`,
+        message: `Failed to save journal page: ${error.message}`,
         duration: 3000,
-        color: 'danger'
+        color: 'danger',
       });
     } finally {
       setIsSaving(false);
@@ -165,63 +195,34 @@ const JournalPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
-        <p>Viewing journal entry {journalId}</p>
+        <IonCard style={{ marginBottom: '20px' }}>
+          <IonCardContent>
+            <p>Viewing journal entry <strong>{journalId}</strong></p>
+            <IonItem>
+              <IonInput
+                value={pageTitle}
+                placeholder="Page Title"
+                onIonChange={(e) => setPageTitle(e.detail.value!)}
+              />
+            </IonItem>
+          </IonCardContent>
+        </IonCard>
 
-        <PageTitle onTitleChange={setPageTitle} />
+        <h2 style={{ margin: '20px 0' }}>How are you feeling today?</h2>
+       <Spectrum/>
 
-        <h1 style={{ margin: '30px 0' }}>How are you feeling today?</h1>
+        <Journalized
+          markdownContent={markdownContent}
+          onContentChange={setMarkdownContent}
+        />
 
-        <IonItem lines="none" style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%', margin: '30px 0 50px 0' }}>
-          <IonLabel>Mood Spectrum</IonLabel>
-          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-            <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
-            <IonRange
-              min={0}
-              max={100}
-              value={moodValue}
-              onIonChange={(e) => setMoodValue(e.detail.value as number)}
-              style={{ 
-                flex: 1, 
-                margin: '0 12px',
-                '--bar-background': `linear-gradient(to right, 
-                  ${moodLevels.map(level => `${level.color} ${level.min}%, ${level.color} ${level.max}%`).join(', ')}` 
-              }}
-            />
-            <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: '8px' }}>
-            {moodLevels.map(level => (
-              <div key={level.level} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <IonIcon icon={level.icon} style={{ color: level.color, fontSize: '16px' }} />
-                <span style={{ fontSize: '10px', marginTop: '4px' }}>{level.level}</span>
-              </div>
-            ))}
-          </div>
-          <IonLabel style={{ 
-            fontSize: '14px', 
-            marginTop: '12px',
-            margin: '10px',
-            color: currentMood.color,
-            fontWeight: 'bold'
-          }}>
-            Current Mood: {currentMood.level}
-          </IonLabel>
-        </IonItem>
+        <Attachments onAttach={handleAddAttachment} />
 
-        <Journalized entry={entry} onEntryChange={setEntry} />
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginTop: '20px'
-        }}>
-          <Attachments onAttach={(att) => setEntry(prev => `${prev}\n[${att.type}] ${att.content}`)} />
-          <SavePage
-            onSave={handleSave}
-            disabled={!entry.trim() || !pageTitle.trim() || isSaving}
-            loading={isSaving}
-          />
-        </div>
+        <SavePage
+          onSave={handleSave}
+          disabled={!pageTitle.trim() || !markdownContent.trim() || isSaving}
+          loading={isSaving}
+        />
       </IonContent>
     </IonPage>
   );

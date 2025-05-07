@@ -1,33 +1,27 @@
-import React, { useState } from 'react';
-import { IonCard, IonCardContent, IonTextarea, IonButton } from '@ionic/react';
+import React from 'react';
+import { IonCard, IonCardContent, IonTextarea } from '@ionic/react';
 
-interface Props {
-  onAddParagraph: (text: string) => void;
+interface JournalizedProps {
+  markdownContent: string;
+  onContentChange: (markdown: string) => void;
 }
 
-const Journalized: React.FC<Props> = ({ onAddParagraph }) => {
-  const [text, setText] = useState('');
-
-  const handleAdd = () => {
-    if (text.trim()) {
-      onAddParagraph(text.trim());
-      setText('');
-    }
-  };
-
+const Journalized: React.FC<JournalizedProps> = ({ markdownContent, onContentChange }) => {
   return (
-    <IonCard>
-      <IonCardContent>
+    <IonCard style={{ height: '400px', margin: '0 0 20px 0' }}>
+      <IonCardContent style={{ height: '100%', padding: '0' }}>
         <IonTextarea
-          value={text}
-          placeholder="Journalize here..."
+          value={markdownContent}
+          placeholder="Write your journal entry (supports Markdown formatting)..."
           autoGrow
           rows={6}
-          onIonChange={(e) => setText(e.detail.value!)}
+          onIonChange={(e) => onContentChange(e.detail.value!)}
+          style={{ 
+            height: '100%',
+            fontSize: '14px',
+            padding: '10px'
+          }}
         />
-        <IonButton expand="block" onClick={handleAdd} style={{ marginTop: '10px' }}>
-          Add Entry
-        </IonButton>
       </IonCardContent>
     </IonCard>
   );
