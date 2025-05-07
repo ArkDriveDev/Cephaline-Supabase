@@ -1,27 +1,23 @@
 .journal-grid-container {
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.journal-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-}
-
-.journal-card-wrapper {
+    gap: 10px;
+    padding: 10px;
+    align-items: flex-start;
+  }
+  
+  .journal-card-wrapper {
     position: relative;
     width: 60px;
     height: 220px;
     cursor: pointer;
     transition: all 0.3s ease;
     margin-right: 1px;
-}
-
-/* Spine Styles */
-.journal-spine {
+    flex-shrink: 0;
+  }
+  
+  /* Spine Styles (unchanged from your original) */
+  .journal-spine {
     position: relative;
     width: 100%;
     height: 100%;
@@ -45,16 +41,15 @@
             transparent 1px,
             transparent 3px);
     overflow: hidden;
-}
-
-/* Pages effect on the right side (always visible) */
-.journal-spine::after {
+  }
+  
+  .journal-spine::after {
     content: "";
     position: absolute;
-    right: -5px; /* Extends to the right */
+    right: -5px;
     top: 0;
     bottom: 0;
-    width: 10px; /* Thickness of pages */
+    width: 10px;
     background: repeating-linear-gradient(
         to right,
         rgba(0,0,0,0.05) 0px,
@@ -64,10 +59,9 @@
     );
     z-index: 1;
     border-radius: 0 3px 3px 0;
-}
-
-/* Spine decorative lines */
-.journal-spine::before {
+  }
+  
+  .journal-spine::before {
     content: "";
     position: absolute;
     left: 5px;
@@ -80,21 +74,21 @@
         rgba(0,0,0,0.1) 100%
     );
     z-index: 3;
-}
-.journal-spine::before { 
+  }
+  .journal-spine::before { 
     top: 5px;
     box-shadow: 
         0 -3px 0 rgba(255,255,255,0.1),
         0 -6px 0 rgba(255,255,255,0.05);
-}
-
-.journal-title-container {
+  }
+  
+  .journal-title-container {
     transform: rotate(90deg) translateY(-5px);
     width: 180px;
     text-align: center;
-}
-
-.journal-title {
+  }
+  
+  .journal-title {
     color: var(--title-color);
     font-size: 0.7rem;
     margin: 0;
@@ -104,15 +98,15 @@
     max-width: 160px;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
     letter-spacing: 0.3px;
-}
-
-.journal-date {
+  }
+  
+  .journal-date {
     color: rgba(255,255,255,0.8);
     font-size: 0.65rem;
     margin-top: 6px;
-}
-
-.journal-card-preview {
+  }
+  
+  .journal-card-preview {
     position: absolute;
     left: 50px;
     top: 0;
@@ -124,22 +118,21 @@
         opacity 0.3s ease,
         left 0.3s ease;
     z-index: 3;
-}
-
-.journal-card {
+  }
+  
+  .journal-card {
     position: relative;
     height: 100%;
     margin: 0;
     background-color: var(--card-color);
     border-radius: 0 4px 4px 0;
-    box-shadow: 3px 3px 0 0 rgba(133, 132, 132, 0.925); /* No blur, sharp shadow */
+    box-shadow: 3px 3px 0 0 rgba(133, 132, 132, 0.925);
     padding: 15px;
     box-sizing: border-box;
-}
-
-/* Card decorative lines */
-.journal-card::before,
-.journal-card::after {
+  }
+  
+  .journal-card::before,
+  .journal-card::after {
     content: "";
     position: absolute;
     left: 5px;
@@ -152,36 +145,56 @@
         rgba(0,0,0,0.1) 100%
     );
     z-index: 3;
-}
-.journal-card::before { 
+  }
+  .journal-card::before { 
     top: 5px;
     box-shadow: 
         0 -3px 0 rgba(228, 218, 218, 0.1),
         0 -6px 0 rgba(255,255,255,0.05);
-}
-.journal-card::after { 
+  }
+  .journal-card::after { 
     bottom: 5px;
     box-shadow: 
         0 3px 0 rgba(255,255,255,0.1),
         0 6px 0 rgba(255,255,255,0.05);
-}
-
-/* Hover Effects */
-.journal-card-wrapper:hover {
+  }
+  
+  /* Hover Effects (unchanged) */
+  .journal-card-wrapper:hover {
     transform: translateX(10px);
-}
-
-.journal-card-wrapper:hover .journal-spine {
+  }
+  
+  .journal-card-wrapper:hover .journal-spine {
     transform: perspective(800px) rotateY(-30deg);
-}
-
-.journal-card-wrapper:hover .journal-card-preview {
+  }
+  
+  .journal-card-wrapper:hover .journal-card-preview {
     opacity: 1;
     left: 55px;
-}
-
-/* Hide the pages effect when hovered */
-.journal-card-wrapper:hover .journal-spine::after {
+  }
+  
+  .journal-card-wrapper:hover .journal-spine::after {
     opacity: 0;
     transition: opacity 0.2s ease;
-}
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .journal-grid-container {
+      justify-content: center;
+    }
+  }
+  
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+  }
