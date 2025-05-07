@@ -1,38 +1,42 @@
-import React, { useState } from 'react';
-import { IonCard, IonCardContent, IonTextarea } from '@ionic/react';
+import {
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonMenuButton,
+  IonPage,
+  IonTitle,
+  IonToolbar
+} from '@ionic/react';
+import PageTitle from '../components/JournalPage_omponents/PageTitle';
+import { useParams } from 'react-router-dom';
+import Spectrum from '../components/JournalPage_omponents/Spectrum';
+import Journalized from '../components/JournalPage_omponents/Journalized';
+import Attachments from '../components/JournalPage_omponents/Attachements';
+import SavePage from '../components/JournalPage_omponents/SavePage';
 
-interface Attachment {
-  type: string;
-  content: string;
-}
-
-const Journalized: React.FC<{ attachments: Attachment[] }> = ({ attachments }) => {
-  const [entry, setEntry] = useState('');
+const JournalPage: React.FC = () => {
+  const { journalId } = useParams<{ journalId: string }>(); // Remove "string" if you get type errors
 
   return (
-    <IonCard style={{height:'400px'}}>
-      <IonCardContent>
-        <IonTextarea
-          value={entry}
-          placeholder="Journalize here..."
-          autoGrow
-          rows={6}
-          onIonChange={(e) => setEntry(e.detail.value!)}
-        />
-        <div style={{ marginTop: '10px' }}>
-          {attachments.map((attachment, index) => (
-            <div key={index} style={{ marginBottom: '5px' }}>
-              {attachment.type === 'link' && (
-                <a href={attachment.content} target="_blank" rel="noopener noreferrer">
-                  {attachment.content}
-                </a>
-              )}
-            </div>
-          ))}
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Journal {journalId}</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent>
+        <p>Viewing journal entry{journalId}</p>
+        <PageTitle />
+        <h1 style={{ margin: '30px', marginTop: '80px' }}>How are you feeling for these Journal?</h1>
+        <Spectrum />
+        <Journalized />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1590px', marginTop: '-18px',}}>
+          <Attachments />
+          <SavePage />
         </div>
-      </IonCardContent>
-    </IonCard>
+      </IonContent>
+    </IonPage>
   );
 };
 
-export default Journalized;
+export default JournalPage;
