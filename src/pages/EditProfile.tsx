@@ -8,6 +8,7 @@ import { useHistory } from 'react-router-dom';
 import AvatarUpload from '../components/editprofile_components/AvatarUpload';
 import PersonalInfoForm from '../components/editprofile_components/PersonalInfoForm';
 import PasswordChangeForm from '../components/editprofile_components/PasswordChangeForm';
+import '../theme/variables.css';
 
 const EditProfile: React.FC = () => {
   const [email, setEmail] = useState('');
