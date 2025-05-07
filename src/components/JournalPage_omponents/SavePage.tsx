@@ -1,10 +1,19 @@
 import React from 'react';
-import { IonButton, IonIcon } from '@ionic/react';
+import { IonButton, IonIcon, useIonRouter } from '@ionic/react';
 import { saveOutline } from 'ionicons/icons';
 
-const SavePage: React.FC = () => {
-  const handleSave = () => {
-    console.log('Page saved!');
+interface SavePageProps {
+  onSave: () => Promise<void>;
+}
+
+const SavePage: React.FC<SavePageProps> = ({ onSave }) => {
+  const handleSave = async () => {
+    try {
+      await onSave();
+      console.log('Page saved successfully!');
+    } catch (error) {
+      console.error('Error saving page:', error);
+    }
   };
 
   return (
