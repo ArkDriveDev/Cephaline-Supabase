@@ -1,23 +1,33 @@
-import React from 'react';
-import { IonCard, IonCardContent, IonTextarea } from '@ionic/react';
+import React, { useState } from 'react';
+import { IonCard, IonCardContent, IonTextarea, IonButton } from '@ionic/react';
 
-interface JournalizedProps {
-  entry: string;
-  onEntryChange: (text: string) => void;
+interface Props {
+  onAddParagraph: (text: string) => void;
 }
 
-const Journalized: React.FC<JournalizedProps> = ({ entry, onEntryChange }) => {
+const Journalized: React.FC<Props> = ({ onAddParagraph }) => {
+  const [text, setText] = useState('');
+
+  const handleAdd = () => {
+    if (text.trim()) {
+      onAddParagraph(text.trim());
+      setText('');
+    }
+  };
+
   return (
-    <IonCard style={{height:'400px'}}>
+    <IonCard>
       <IonCardContent>
         <IonTextarea
-          value={entry}
+          value={text}
           placeholder="Journalize here..."
           autoGrow
           rows={6}
-          onIonChange={(e) => onEntryChange(e.detail.value!)}
-          style={{ height: '100%' }}
+          onIonChange={(e) => setText(e.detail.value!)}
         />
+        <IonButton expand="block" onClick={handleAdd} style={{ marginTop: '10px' }}>
+          Add Entry
+        </IonButton>
       </IonCardContent>
     </IonCard>
   );
