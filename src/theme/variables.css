@@ -1,2 +1,58 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
+
+/* global.css or variables.css */
+
+ion-content {
+    --background: none;
+    background: linear-gradient(135deg, #000000, rgb(35, 115, 213), #ffffff) !important;
+  }
+  
+  ion-toolbar {
+    --background: rgb(44, 42, 42) !important;
+    background: transparent !important;
+  }
+  
+  .fancy-card {
+    backdrop-filter: blur(10px);
+    background: rgb(0, 0, 0);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    border-radius: 16px;
+    animation: fadeSlideIn 1s ease;
+    color: #fff;
+  }
+  
+  .fancy-card:hover {
+    transform: scale(1.02);
+    transition: transform 0.3s ease;
+  }
+  
+  .fancy-input {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+  }
+  
+  .fancy-button {
+    background: linear-gradient(to right, rgb(52, 154, 177), #2193b0);
+    color: white;
+    font-weight: bold;
+    transition: transform 0.2s;
+  }
+  
+  .fancy-button:hover {
+    transform: scale(1.03);
+  }
+  
+  @keyframes fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
