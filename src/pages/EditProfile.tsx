@@ -170,13 +170,14 @@ const EditProfile: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonButtons slot="start">
-          <IonBackButton defaultHref="/it35-lab/app" />
         </IonButtons>
       </IonHeader>
       <IonContent className="ion-padding">
         <IonItem>
-          <IonText color="secondary">
-            <h1>Edit Account</h1>
+          <IonText color="dark">
+          <div style={{ paddingTop: '40px', paddingBottom: '16px' }}>
+    <h1 style={{ color: 'white', textAlign: 'center', marginBottom: '16px' }}>Edit Account</h1>
+  </div>
           </IonText>
         </IonItem>
         <br />
