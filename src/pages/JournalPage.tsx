@@ -24,6 +24,7 @@ const JournalPage: React.FC = () => {
       <IonContent>
         <p>Viewing journal entry{journalId}</p>
         <PageTitle/>
+        <h1  style={{margin:'20px',marginTop:'60px'}}>How are you feeling for these Journal?</h1>
         <Spectrum/>
       </IonContent>
     </IonPage>
