@@ -5,7 +5,7 @@ const Journalized: React.FC = () => {
   const [entry, setEntry] = useState('');
 
   return (
-    <IonCard>
+    <IonCard style={{height:'400px'}}>
       <IonCardContent>
         <IonTextarea
           value={entry}
