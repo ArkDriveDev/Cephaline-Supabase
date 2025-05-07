@@ -1,8 +1,10 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar,IonRouterOutlet} from '@ionic/react';
 import Profile from '../components/home_components/profile';
 import Searchbar from '../components/home_components/SearchBar';
 import NewButton from '../components/home_components/NewButton';
 import JournalCards from '../components/home_components/JournalCards';
+import { Redirect, Route } from 'react-router';
+import EditProfile from './EditProfile';
 const Home: React.FC = () => {
     return (
         <IonPage>

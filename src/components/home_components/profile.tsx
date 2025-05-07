@@ -90,7 +90,7 @@ const Profile: React.FC = () => {
       <IonButton 
         fill="outline" 
         style={{ marginTop: '16px' }}
-        routerLink="/edit-profile" // Link to your edit profile page
+        routerLink="/cephaline-supabase/app/editProfile" 
       >
         <IonIcon icon={pencil} slot="start" />
         Edit Profile
