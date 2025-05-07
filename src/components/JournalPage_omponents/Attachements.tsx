@@ -19,15 +19,26 @@ const Attachments: React.FC = () => {
   const [hovered, setHovered] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
   const handleIconClick = (id: string) => {
-    if (id === 'link') {
-      setShowLinkModal(true);
-    } else if (id === 'image') {
-      setShowImageModal(true);
+    switch(id) {
+      case 'link':
+        setShowLinkModal(true);
+        break;
+      case 'image':
+        setShowImageModal(true);
+        break;
+      case 'file':
+        setShowFileModal(true);
+        break;
+      case 'folder':
+        console.log('Folder attachment clicked');
+        break;
+      default:
+        break;
     }
-    // Add other cases for file and folder when needed
   };
 
   const handleSubmitLink = () => {
@@ -39,6 +50,7 @@ const Attachments: React.FC = () => {
   const handleCloseModal = () => {
     setShowLinkModal(false);
     setShowImageModal(false);
+    setShowFileModal(false);
     setLinkUrl('');
   };
 
@@ -169,6 +181,81 @@ const Attachments: React.FC = () => {
             </div>
             <IonButton expand="block" onClick={() => console.log('Attach image functionality')}>
               Attach Image
+            </IonButton>
+          </div>
+        </IonContent>
+      </IonModal>
+
+      {/* File Modal */}
+      <IonModal
+        isOpen={showFileModal}
+        onDidDismiss={handleCloseModal}
+        style={{
+          '--height': '50%',
+          '--border-radius': '16px',
+          '--box-shadow': '0 4px 16px rgba(0,0,0,0.12)'
+        }}
+      >
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Attach File</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={handleCloseModal}>
+                <IonIcon icon={closeOutline} />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100%',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ 
+              border: '2px dashed #ccc',
+              borderRadius: '8px',
+              padding: '20px',
+              textAlign: 'center',
+              marginBottom: '16px',
+              flexGrow: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <IonIcon 
+                icon={documentAttachOutline} 
+                size="large" 
+                style={{ marginBottom: '8px' }} 
+              />
+              <p>Drag and drop files here or</p>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <IonButton 
+                  fill="outline" 
+                  style={{ marginTop: '8px' }}
+                  onClick={() => console.log('Select document clicked')}
+                >
+                  Documents
+                </IonButton>
+                <IonButton 
+                  fill="outline" 
+                  style={{ marginTop: '8px' }}
+                  onClick={() => console.log('Select PDF clicked')}
+                >
+                  PDFs
+                </IonButton>
+                <IonButton 
+                  fill="outline" 
+                  style={{ marginTop: '8px' }}
+                  onClick={() => console.log('Select other file clicked')}
+                >
+                  Other Files
+                </IonButton>
+              </div>
+            </div>
+            <IonButton expand="block" onClick={() => console.log('Attach file functionality')}>
+              Attach File
             </IonButton>
           </div>
         </IonContent>
