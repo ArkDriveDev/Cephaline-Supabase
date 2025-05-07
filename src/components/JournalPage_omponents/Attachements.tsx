@@ -1,5 +1,5 @@
-import React from 'react';
-import { IonIcon, IonRow, IonCol, IonContent, IonPopover } from '@ionic/react';
+import React, { useState } from 'react';
+import { IonIcon, IonRow, IonCol } from '@ionic/react';
 import {
   linkOutline,
   imageOutline,
@@ -7,57 +7,53 @@ import {
   folderOpenOutline
 } from 'ionicons/icons';
 
+const icons = [
+  { id: 'link', icon: linkOutline, label: 'Attach Link' },
+  { id: 'image', icon: imageOutline, label: 'Attach Image' },
+  { id: 'file', icon: documentAttachOutline, label: 'Attach File' },
+  { id: 'folder', icon: folderOpenOutline, label: 'Attach Folder' }
+];
+
 const Attachments: React.FC = () => {
+  const [hovered, setHovered] = useState<string | null>(null);
+
   return (
     <IonRow style={{ justifyContent: 'flex-start', gap: '1px', padding: '8px' }}>
-      <IonCol size="auto">
-        <IonIcon
-          id="hover-trigger1"
-          icon={linkOutline}
-          size="large"
-          onClick={() => console.log('Attach Link')}
-          style={{ cursor: 'pointer' }}
-        />
-        <IonPopover trigger="hover-trigger1" triggerAction="hover" side='top'>
-          <IonContent class="ion-padding">Attach Link</IonContent>
-        </IonPopover>
-      </IonCol>
-      <IonCol size="auto">
-        <IonIcon
-          id="hover-trigger2"
-          icon={imageOutline}
-          size="large"
-          onClick={() => console.log('Attach Image')}
-          style={{ cursor: 'pointer' }}
-        />
-        <IonPopover trigger="hover-trigger2" triggerAction="hover" side='top'>
-          <IonContent class="ion-padding">Attach Image</IonContent>
-        </IonPopover>
-      </IonCol>
-      <IonCol size="auto">
-        <IonIcon
-          id="hover-trigger3"
-          icon={documentAttachOutline}
-          size="large"
-          onClick={() => console.log('Attach File')}
-          style={{ cursor: 'pointer' }}
-        />
-        <IonPopover trigger="hover-trigger3" triggerAction="hover" side='top'>
-          <IonContent class="ion-padding">Attach File</IonContent>
-        </IonPopover>
-      </IonCol>
-      <IonCol size="auto">
-        <IonIcon
-          id="hover-trigger4"
-          icon={folderOpenOutline}
-          size="large"
-          onClick={() => console.log('Attach Folder')}
-          style={{ cursor: 'pointer' }}
-        />
-        <IonPopover trigger="hover-trigger4" triggerAction="hover" side='top'>
-          <IonContent class="ion-padding">Attach Folder</IonContent>
-        </IonPopover>
-      </IonCol>
+      {icons.map(({ id, icon, label }) => (
+        <IonCol size="auto" key={id}>
+          <div
+            onMouseEnter={() => setHovered(id)}
+            onMouseLeave={() => setHovered(null)}
+            style={{ position: 'relative', display: 'inline-block' }}
+          >
+            <IonIcon
+              icon={icon}
+              size="large"
+              onClick={() => console.log(label)}
+              style={{ cursor: 'pointer' }}
+            />
+            {hovered === id && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-40px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap',
+                  zIndex: 1000,
+                  fontSize: '14px'
+                }}
+              >
+                {label}
+              </div>
+            )}
+          </div>
+        </IonCol>
+      ))}
     </IonRow>
   );
 };
