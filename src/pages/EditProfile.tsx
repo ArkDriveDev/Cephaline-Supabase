@@ -81,12 +81,13 @@ const EditProfile: React.FC = () => {
   
     const user = session.session.user;
   
-    if (!user.email) {
-      setAlertMessage('Error: User email is missing.');
+    if (!user.email || !user.id) {
+      setAlertMessage('Error: User information is incomplete.');
       setShowAlert(true);
       return;
     }
       
+    // Verify current password
     const { error: passwordError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: currentPassword,
@@ -101,27 +102,37 @@ const EditProfile: React.FC = () => {
     let avatarUrl = avatarPreview;
   
     if (avatarFile) {
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-    
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('user-avatars')
-        .upload(filePath, avatarFile, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-    
-      if (uploadError) {
-        setAlertMessage(`Avatar upload failed: ${uploadError.message}`);
+      try {
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+      
+        const { error: uploadError } = await supabase.storage
+          .from('user-avatars')
+          .upload(filePath, avatarFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+      
+        if (uploadError) {
+          throw uploadError;
+        }
+      
+        const { data: { publicUrl } } = await supabase.storage
+          .from('user-avatars')
+          .getPublicUrl(filePath);
+        
+        avatarUrl = publicUrl;
+      } catch (error) {
+        // Safe error message handling
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        setAlertMessage(`Avatar upload failed: ${errorMessage}`);
         setShowAlert(true);
         return;
       }
-    
-      const { data } = supabase.storage.from('user-avatars').getPublicUrl(filePath);
-      avatarUrl = data.publicUrl;
     }
       
+    // Update user profile
     const { error: updateError } = await supabase
       .from('users')
       .update({
@@ -138,6 +149,7 @@ const EditProfile: React.FC = () => {
       return;
     }
   
+    // Update password if changed
     if (password) {
       const { error: passwordUpdateError } = await supabase.auth.updateUser({
         password: password,
@@ -152,9 +164,8 @@ const EditProfile: React.FC = () => {
   
     setAlertMessage('Account updated successfully!');
     setShowAlert(true);
-    history.push('/it35-lab/app');
+    history.push('/cephaline-supabase/app');
   };
-
   return (
     <IonPage>
       <IonHeader>
