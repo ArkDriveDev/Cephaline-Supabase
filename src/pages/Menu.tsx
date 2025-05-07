@@ -20,7 +20,7 @@ import EditProfile from './EditProfile';
   const Menu: React.FC = () => {
     const path = [
       { name: 'Home', url: '/cephaline-supabase/app/home', icon: homeOutline },
-      { name: 'Profile', url: '/it35-lab/app/editProfile', icon: personCircleOutline }
+      { name: 'Profile', url: '/cephaline-supabase/app/editProfile', icon: personCircleOutline }
     ]
   
     const glow = {
@@ -86,7 +86,7 @@ import EditProfile from './EditProfile';
           <IonContent className="ion-padding">
             <IonRouterOutlet id="main">
               <Route exact path="/cephaline-supabase/app/home" component={Home} />
-              <Route exact path="/it35-lab/app/editProfile" component={EditProfile} />
+              <Route exact path="/cephaline-supabase/app/editProfile" component={EditProfile} />
               <Route exact path="/cephaline-supabase/app">
                 <Redirect to="/cephaline-supabase/app/home" />
               </Route>
