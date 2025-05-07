@@ -11,13 +11,14 @@ import {
 const icons = [
   { id: 'link', icon: linkOutline, label: 'Attach Link' },
   { id: 'image', icon: imageOutline, label: 'Attach Image' },
-  { id: 'file', icon: documentAttachOutline, label: 'Attach File' },
+  { id: 'file', icon: documentAttachOutline, label: 'Attach Document' }, // Changed label to Document
   { id: 'folder', icon: folderOpenOutline, label: 'Attach Folder' }
 ];
 
 interface Attachment {
   type: string;
   content: string;
+  file?: File; // Added file to the interface
 }
 
 const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({ onAttach }) => {
@@ -32,14 +33,28 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // Allowed document file types
+  const allowedFileTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    'text/plain'
+  ];
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.type.startsWith('image/')) {
         const imageUrl = URL.createObjectURL(file);
         setSelectedImage(imageUrl);
-      } else {
+      } else if (allowedFileTypes.includes(file.type)) {
         setSelectedFile(file);
+      } else {
+        alert('Please select a valid document file (PDF, Word, Excel, PowerPoint, or Text)');
       }
     }
   };
@@ -65,7 +80,6 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
 
   const handleSubmitLink = () => {
     if (linkUrl.trim()) {
-      // Add http:// if not present
       let formattedUrl = linkUrl;
       if (!/^https?:\/\//i.test(linkUrl)) {
         formattedUrl = 'http://' + linkUrl;
@@ -95,7 +109,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     if (selectedFile) {
       onAttach({
         type: 'file',
-        content: `[File: ${selectedFile.name}](${URL.createObjectURL(selectedFile)})`
+        content: `[Document: ${selectedFile.name}]`,
+        file: selectedFile
       });
       setSelectedFile(null);
       setShowFileModal(false);
@@ -110,6 +125,27 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
     setLinkUrl('');
     setSelectedImage(null);
     setSelectedFile(null);
+  };
+
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return 'assets/icon/pdf-icon.png';
+      case 'doc':
+      case 'docx':
+        return 'assets/icon/word-icon.png';
+      case 'xls':
+      case 'xlsx':
+        return 'assets/icon/excel-icon.png';
+      case 'ppt':
+      case 'pptx':
+        return 'assets/icon/powerpoint-icon.png';
+      case 'txt':
+        return 'assets/icon/text-icon.png';
+      default:
+        return 'assets/icon/file-icon.png';
+    }
   };
 
   return (
@@ -267,7 +303,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         </IonContent>
       </IonModal>
 
-      {/* File Modal */}
+      {/* File Modal - Updated for documents */}
       <IonModal
         isOpen={showFileModal}
         onDidDismiss={handleCloseModal}
@@ -279,7 +315,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       >
         <IonHeader>
           <IonToolbar>
-            <IonTitle>Attach File</IonTitle>
+            <IonTitle>Attach Document</IonTitle>
             <IonButtons slot="end">
               <IonButton onClick={handleCloseModal}>
                 <IonIcon icon={closeOutline} />
@@ -303,12 +339,18 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               flexGrow: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              alignItems: 'center'
             }}>
               {selectedFile ? (
-                <div>
-                  <p>Selected file: {selectedFile.name}</p>
-                  <p>Size: {(selectedFile.size / 1024).toFixed(2)} KB</p>
+                <div style={{ textAlign: 'center' }}>
+                  <img 
+                    src={getFileIcon(selectedFile.name)} 
+                    alt="File type" 
+                    style={{ width: '64px', height: '64px', marginBottom: '16px' }}
+                  />
+                  <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{selectedFile.name}</p>
+                  <p style={{ color: '#666' }}>{(selectedFile.size / 1024).toFixed(2)} KB</p>
                 </div>
               ) : (
                 <>
@@ -317,19 +359,20 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     size="large"
                     style={{ marginBottom: '8px' }}
                   />
-                  <p>Drag and drop files here or</p>
+                  <p>Drag and drop documents here or</p>
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    Select File
+                    Select Document
                   </IonButton>
                   <input
                     type="file"
                     ref={fileInputRef}
                     style={{ display: 'none' }}
                     onChange={handleFileChange}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                   />
                 </>
               )}
@@ -339,7 +382,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
               onClick={handleAttachFile}
               disabled={!selectedFile}
             >
-              Attach File
+              Attach Document
             </IonButton>
           </div>
         </IonContent>
