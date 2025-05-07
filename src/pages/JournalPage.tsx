@@ -9,6 +9,7 @@ import {
   } from '@ionic/react';
 import PageTitle from '../components/JournalPage_omponents/PageTitle';
 import { useParams } from 'react-router-dom';
+import Spectrum from '../components/JournalPage_omponents/Spectrum';
 
 const JournalPage: React.FC = () => {
   const { journalId } = useParams<{ journalId: string }>(); // Remove "string" if you get type errors
@@ -23,6 +24,7 @@ const JournalPage: React.FC = () => {
       <IonContent>
         <p>Viewing journal entry{journalId}</p>
         <PageTitle/>
+        <Spectrum/>
       </IonContent>
     </IonPage>
   );
