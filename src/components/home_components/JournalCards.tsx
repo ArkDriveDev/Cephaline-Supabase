@@ -79,50 +79,57 @@ const JournalCards: React.FC = () => {
     <div className="journal-grid-container">
       {rows.map((row, rowIndex) => (
         <div key={rowIndex} className="journal-row">
-          {row.map((journal, colIndex) => (
-            <div
-              key={journal.journal_id}
-              className="journal-card-wrapper"
-              style={{ zIndex: row.length - colIndex }}
-              onClick={() => handleCardClick(journal.journal_id)}
-            >
-              <IonCard className="journal-card" style={{
-                backgroundColor: journal.card_color,
-              }}>
-                <IonCardHeader>
-                  <IonCardTitle
-                    className="journal-title"
-                    id={`hover-trigger-${journal.journal_id}`}
-                    style={{ color: journal.title_color }}
-                  >
-                    {journal.title}
-                  </IonCardTitle>
-                  <IonPopover
-                    trigger={`hover-trigger-${journal.journal_id}`}
-                    triggerAction="hover"
-                    side="top"
-                  >
-                    <div className="ion-padding">Click To Open Journal</div>
-                  </IonPopover>
-                </IonCardHeader>
-
-                <IonCardContent className="journal-content">
-                  <p className="journal-description" style={{ color: journal.description_color }}>
-                    {journal.description}
-                  </p>
-                  <small className="journal-date">
-                    Created: {new Date(journal.created_at).toLocaleDateString()}
-                  </small>
-                </IonCardContent>
-              </IonCard>
-
-              {/* Book spine effect */}
+          {row.map((journal, colIndex) => {
+            const cardStyle: React.CSSProperties & {
+              '--card-color': string;
+              '--title-color': string;
+            } = {
+              zIndex: row.length - colIndex,
+              '--card-color': journal.card_color,
+              '--title-color': journal.title_color
+            };
+  
+            return (
               <div
-                className="journal-spine"
-                style={{ zIndex: row.length - colIndex - 1 }}
-              />
-            </div>
-          ))}
+                key={journal.journal_id}
+                className="journal-card-wrapper"
+                style={cardStyle}
+                onClick={() => handleCardClick(journal.journal_id)}
+              >
+                <div className="journal-spine">
+                  <div className="journal-title-container">
+                    <h3 className="journal-title">{journal.title}</h3>
+                    <div className="journal-date">
+                      {new Date(journal.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        year: 'numeric' 
+                      })}
+                    </div>
+                  </div>
+                </div>
+  
+                <div className="journal-card-preview">
+                  <IonCard className="journal-card" style={{
+                    backgroundColor: journal.card_color,
+                  }}>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ color: journal.title_color }}>
+                        {journal.title}
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <p style={{ color: journal.description_color }}>
+                        {journal.description}
+                      </p>
+                      <small>
+                        Created: {new Date(journal.created_at).toLocaleDateString()}
+                      </small>
+                    </IonCardContent>
+                  </IonCard>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
