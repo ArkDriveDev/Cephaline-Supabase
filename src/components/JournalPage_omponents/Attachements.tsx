@@ -30,12 +30,16 @@ const icons = [
 
 interface Attachment {
   type: 'link' | 'image' | 'file' | 'folder';
-  content: string;
-  file?: File;
+  content: string | File;
   files?: File[];
 }
 
-const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({ onAttach }) => {
+interface AttachmentsProps {
+  onAttach: (attachment: Attachment) => void;
+  isUploading: boolean;
+}
+
+const Attachments: React.FC<AttachmentsProps> = ({ onAttach, isUploading }) => {
   const [hovered, setHovered] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -45,36 +49,26 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFolderFiles, setSelectedFolderFiles] = useState<File[]>([]);
 
-  const allowedFileTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain'
-  ];
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploading) return;
+    
     const file = e.target.files?.[0];
     if (file) {
       if (file.type.startsWith('image/')) {
-        const imageUrl = URL.createObjectURL(file);
-        setSelectedImage(imageUrl);
-      } else if (allowedFileTypes.includes(file.type)) {
-        setSelectedFile(file);
+        setSelectedImage(file);
       } else {
-        alert('Please select a valid document file (PDF, Word, Excel, PowerPoint, or Text)');
+        setSelectedFile(file);
       }
     }
   };
 
   const handleFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploading) return;
+    
     const files = e.target.files;
     if (files && files.length > 0) {
       setSelectedFolderFiles(Array.from(files));
@@ -82,6 +76,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   };
 
   const handleIconClick = (id: string) => {
+    if (isUploading) return;
+    
     switch (id) {
       case 'link':
         setShowLinkModal(true);
@@ -101,57 +97,53 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
   };
 
   const handleSubmitLink = () => {
-    if (linkUrl.trim()) {
-      let formattedUrl = linkUrl;
-      if (!/^https?:\/\//i.test(linkUrl)) {
-        formattedUrl = 'http://' + linkUrl;
-      }
-
-      onAttach({
-        type: 'link',
-        content: `[${formattedUrl}](${formattedUrl})` // Markdown format
-      });
-      setShowLinkModal(false);
-      setLinkUrl('');
+    if (isUploading || !linkUrl.trim()) return;
+    
+    let formattedUrl = linkUrl;
+    if (!/^https?:\/\//i.test(linkUrl)) {
+      formattedUrl = 'http://' + linkUrl;
     }
+
+    onAttach({
+      type: 'link',
+      content: formattedUrl
+    });
+    setShowLinkModal(false);
+    setLinkUrl('');
   };
 
   const handleAttachImage = () => {
-    if (selectedImage) {
-      onAttach({
-        type: 'image',
-        content: `![Image](${selectedImage})` // Markdown format
-      });
-      setSelectedImage(null);
-      setShowImageModal(false);
-    }
+    if (isUploading || !selectedImage) return;
+    
+    onAttach({
+      type: 'image',
+      content: selectedImage
+    });
+    setSelectedImage(null);
+    setShowImageModal(false);
   };
 
   const handleAttachFile = () => {
-    if (selectedFile) {
-      onAttach({
-        type: 'file',
-        content: `[File: ${selectedFile.name}]`, // Markdown format
-        file: selectedFile
-      });
-      setSelectedFile(null);
-      setShowFileModal(false);
-    }
+    if (isUploading || !selectedFile) return;
+    
+    onAttach({
+      type: 'file',
+      content: selectedFile
+    });
+    setSelectedFile(null);
+    setShowFileModal(false);
   };
 
   const handleAttachFolder = () => {
-    if (selectedFolderFiles.length > 0) {
-      const folderPath = selectedFolderFiles[0].webkitRelativePath;
-      const folderName = folderPath.split('/')[0];
-      
-      onAttach({
-        type: 'folder',
-        content: `[Folder: ${folderName}]`, // Markdown format
-        files: selectedFolderFiles
-      });
-      setSelectedFolderFiles([]);
-      setShowFolderModal(false);
-    }
+    if (isUploading || selectedFolderFiles.length === 0) return;
+    
+    onAttach({
+      type: 'folder',
+      content: selectedFolderFiles[0].webkitRelativePath.split('/')[0],
+      files: selectedFolderFiles
+    });
+    setSelectedFolderFiles([]);
+    setShowFolderModal(false);
   };
 
   const handleCloseModal = () => {
@@ -190,15 +182,22 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
         {icons.map(({ id, icon, label }) => (
           <IonCol size="auto" key={id}>
             <div
-              onMouseEnter={() => setHovered(id)}
+              onMouseEnter={() => !isUploading && setHovered(id)}
               onMouseLeave={() => setHovered(null)}
-              style={{ position: 'relative', display: 'inline-block' }}
+              style={{ 
+                position: 'relative', 
+                display: 'inline-block',
+                opacity: isUploading ? 0.6 : 1
+              }}
             >
               <IonIcon
                 icon={icon}
                 size="large"
                 onClick={() => handleIconClick(id)}
-                style={{ cursor: 'pointer', padding: '4px' }}
+                style={{ 
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  padding: '4px'
+                }}
               />
               {hovered === id && (
                 <div
@@ -242,9 +241,14 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
             placeholder="Enter URL (e.g., example.com)"
             onIonChange={(e) => setLinkUrl(e.detail.value!)}
             style={{ marginBottom: '16px' }}
+            disabled={isUploading}
           />
-          <IonButton expand="block" onClick={handleSubmitLink}>
-            Attach Link
+          <IonButton 
+            expand="block" 
+            onClick={handleSubmitLink}
+            disabled={isUploading || !linkUrl.trim()}
+          >
+            {isUploading ? 'Uploading...' : 'Attach Link'}
           </IonButton>
         </IonContent>
       </IonModal>
@@ -278,7 +282,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
             }}>
               {selectedImage ? (
                 <img
-                  src={selectedImage}
+                  src={URL.createObjectURL(selectedImage)}
                   alt="Preview"
                   style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }}
                 />
@@ -295,7 +299,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    disabled={isUploading}
                   >
                     Select Image
                   </IonButton>
@@ -305,6 +310,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     ref={fileInputRef}
                     style={{ display: 'none' }}
                     onChange={handleFileChange}
+                    disabled={isUploading}
                   />
                 </>
               )}
@@ -312,9 +318,9 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
             <IonButton 
               expand="block" 
               onClick={handleAttachImage}
-              disabled={!selectedImage}
+              disabled={isUploading || !selectedImage}
             >
-              Attach Image
+              {isUploading ? 'Uploading...' : 'Attach Image'}
             </IonButton>
           </div>
         </IonContent>
@@ -324,7 +330,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
       <IonModal isOpen={showFileModal} onDidDismiss={handleCloseModal}>
         <IonHeader>
           <IonToolbar>
-            <IonTitle>Attach Document</IonTitle>
+            <IonTitle>Attach File</IonTitle>
             <IonButtons slot="end">
               <IonButton onClick={handleCloseModal}>
                 <IonIcon icon={closeOutline} />
@@ -365,21 +371,22 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     style={{ marginBottom: '8px', color: 'var(--ion-color-medium)' }}
                   />
                   <IonText color="medium">
-                    <p>Drag and drop documents here or</p>
+                    <p>Drag and drop files here or</p>
                   </IonText>
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    disabled={isUploading}
                   >
-                    Select Document
+                    Select File
                   </IonButton>
                   <input
                     type="file"
                     ref={fileInputRef}
                     style={{ display: 'none' }}
                     onChange={handleFileChange}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                    disabled={isUploading}
                   />
                 </>
               )}
@@ -387,9 +394,9 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
             <IonButton 
               expand="block" 
               onClick={handleAttachFile}
-              disabled={!selectedFile}
+              disabled={isUploading || !selectedFile}
             >
-              Attach Document
+              {isUploading ? 'Uploading...' : 'Attach File'}
             </IonButton>
           </div>
         </IonContent>
@@ -461,7 +468,8 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                   <IonButton
                     fill="outline"
                     style={{ marginTop: '8px' }}
-                    onClick={() => folderInputRef.current?.click()}
+                    onClick={() => !isUploading && folderInputRef.current?.click()}
+                    disabled={isUploading}
                   >
                     Select Folder
                   </IonButton>
@@ -472,6 +480,7 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
                     onChange={handleFolderChange}
                     webkitdirectory=""
                     multiple
+                    disabled={isUploading}
                   />
                 </>
               )}
@@ -479,9 +488,9 @@ const Attachments: React.FC<{ onAttach: (attachment: Attachment) => void }> = ({
             <IonButton 
               expand="block" 
               onClick={handleAttachFolder}
-              disabled={selectedFolderFiles.length === 0}
+              disabled={isUploading || selectedFolderFiles.length === 0}
             >
-              Attach Folder
+              {isUploading ? 'Uploading...' : 'Attach Folder'}
             </IonButton>
           </div>
         </IonContent>

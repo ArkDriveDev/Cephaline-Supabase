@@ -11,19 +11,24 @@ import {
   IonItem,
   IonInput,
   IonCard,
-  IonCardContent
+  IonCardContent,
 } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
 import Journalized from '../components/JournalPage_omponents/Journalized';
-import Attachments from '../components/JournalPage_omponents/Attachements';
 import SavePage from '../components/JournalPage_omponents/SavePage';
 import Spectrum from '../components/JournalPage_omponents/Spectrum';
-
+import Attachments from '../components/JournalPage_omponents/Attachements';
 
 interface JournalBlock {
   type: 'paragraph' | 'link' | 'image' | 'file' | 'folder';
   content: string;
+}
+
+interface Attachment {
+  type: string;
+  content: string | File;
+  name?: string;
 }
 
 const JournalPage: React.FC = () => {
@@ -33,24 +38,74 @@ const JournalPage: React.FC = () => {
   const [markdownContent, setMarkdownContent] = useState('');
   const [pageTitle, setPageTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [present] = useIonToast();
 
-  const handleAddAttachment = (attachment: { type: string; content: string }) => {
-    let formattedContent = '';
-    switch(attachment.type) {
-      case 'image':
-        formattedContent = `\n![${attachment.content.split('/').pop()}](${attachment.content})\n`;
-        break;
-      case 'file':
-        formattedContent = `\n[file: ${attachment.content.split('/').pop()}](${attachment.content})\n`;
-        break;
-      case 'folder':
-        formattedContent = `\n[folder: ${attachment.content.split('/').pop()}](${attachment.content})\n`;
-        break;
-      default:
-        formattedContent = `\n${attachment.content}\n`;
+  const handleFileUploadWithProgress = async (file: File) => {
+    setIsUploading(true);
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const userId = user?.id;
+  
+      if (userError || !userId) {
+        throw new Error('You must be logged in to upload files');
+      }
+  
+      // Create file path
+      const timestamp = Date.now();
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${userId}/${journalId}/${timestamp}_${sanitizedFileName}`;
+  
+      // Upload file
+      const { data: uploadData, error } = await supabase.storage
+        .from('journal-contents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type
+        });
+  
+      if (error) throw error;
+  
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('journal-contents')
+        .getPublicUrl(filePath);
+  
+      return urlData.publicUrl;
+    } catch (error: any) {
+      present({
+        message: `Upload failed: ${error.message}`,
+        duration: 3000,
+        color: 'danger'
+      });
+      return null;
+    } finally {
+      setIsUploading(false);
     }
-    setMarkdownContent(prev => prev + formattedContent);
+  };
+
+  const handleAddAttachment = async (attachment: Attachment) => {
+    try {
+      let contentUrl = attachment.content;
+      
+      // Handle file uploads
+      if (attachment.content instanceof File) {
+        const uploadedUrl = await handleFileUploadWithProgress(attachment.content);
+        if (!uploadedUrl) return;
+        contentUrl = uploadedUrl;
+      }
+  
+      // Simply add the URL to the content
+      setMarkdownContent(prev => prev + `\n${contentUrl}\n`);
+    } catch (error) {
+      present({
+        message: 'Failed to attach file',
+        duration: 3000,
+        color: 'danger'
+      });
+    }
   };
 
   const parseContent = (markdown: string): JournalBlock[] => {
@@ -60,43 +115,22 @@ const JournalPage: React.FC = () => {
     for (const line of lines) {
       if (!line.trim()) continue;
 
-      // Image detection (markdown format)
-      const imageMatch = line.match(/!\[(.*?)\]\((.*?)\)/);
-      if (imageMatch) {
-        blocks.push({ type: 'image', content: imageMatch[2] });
+      // Check if line is a URL
+      try {
+        new URL(line.trim());
+        blocks.push({ type: 'link', content: line.trim() });
         continue;
+      } catch (e) {
+        // Not a URL, treat as paragraph
+        blocks.push({ type: 'paragraph', content: line });
       }
-
-      // File detection (custom format)
-      const fileMatch = line.match(/\[file: (.*?)\]\((.*?)\)/);
-      if (fileMatch) {
-        blocks.push({ type: 'file', content: fileMatch[2] });
-        continue;
-      }
-
-      // Folder detection (custom format)
-      const folderMatch = line.match(/\[folder: (.*?)\]\((.*?)\)/);
-      if (folderMatch) {
-        blocks.push({ type: 'folder', content: folderMatch[2] });
-        continue;
-      }
-
-      // Regular link detection (markdown format)
-      const linkMatch = line.match(/\[(.*?)\]\((.*?)\)/);
-      if (linkMatch && !line.includes('file:') && !line.includes('folder:')) {
-        blocks.push({ type: 'link', content: linkMatch[2] });
-        continue;
-      }
-
-      // Default to paragraph
-      blocks.push({ type: 'paragraph', content: line });
     }
 
     return blocks;
   };
 
   const validateInputs = (): boolean => {
-    if (!journalId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(journalId)) {
+    if (!journalId) {
       present({ message: 'Invalid journal selected', duration: 2000, color: 'danger' });
       return false;
     }
@@ -120,7 +154,7 @@ const JournalPage: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!validateInputs()) return;
+    if (!validateInputs() || isUploading) return;
 
     setIsSaving(true);
 
@@ -156,9 +190,6 @@ const JournalPage: React.FC = () => {
         content_order: index + 1,
         paragraph: block.type === 'paragraph' ? block.content : null,
         link: block.type === 'link' ? block.content : null,
-        image_url: block.type === 'image' ? block.content : null,
-        file_url: block.type === 'file' ? block.content : null,
-        folder_name: block.type === 'folder' ? block.content : null,
       }));
 
       const { error: contentError } = await supabase
@@ -168,14 +199,11 @@ const JournalPage: React.FC = () => {
       if (contentError) throw contentError;
 
       present({ message: 'Journal page saved successfully!', duration: 2000, color: 'success' });
-
-      // Reset form
       setMarkdownContent('');
       setPageTitle('');
     } catch (error: any) {
-      console.error('Save error:', error);
       present({
-        message: `Failed to save journal page: ${error.message}`,
+        message: `Failed to save: ${error.message}`,
         duration: 3000,
         color: 'danger',
       });
@@ -209,18 +237,21 @@ const JournalPage: React.FC = () => {
         </IonCard>
 
         <h2 style={{ margin: '20px 0' }}>How are you feeling today?</h2>
-       <Spectrum/>
+        <Spectrum />
 
         <Journalized
           markdownContent={markdownContent}
           onContentChange={setMarkdownContent}
         />
 
-        <Attachments onAttach={handleAddAttachment} />
+        <Attachments
+          onAttach={handleAddAttachment}
+          isUploading={isUploading}
+        />
 
         <SavePage
           onSave={handleSave}
-          disabled={!pageTitle.trim() || !markdownContent.trim() || isSaving}
+          disabled={!pageTitle.trim() || !markdownContent.trim() || isSaving || isUploading}
           loading={isSaving}
         />
       </IonContent>
