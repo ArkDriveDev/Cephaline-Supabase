@@ -1,27 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { IonSearchbar } from '@ionic/react';
 
 interface SearchbarProps {
-  onSearch: (searchTerm: string) => void;
+  value: string;
+  onChange: (value: string) => void;
 }
 
-function Searchbar({ onSearch }: SearchbarProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const handleSearch = (e: CustomEvent) => {
-    const term = e.detail.value || '';
-    setSearchTerm(term);
-    onSearch(term.toLowerCase());
-  };
-
+function Searchbar({ value, onChange }: SearchbarProps) {
   return (
-    <IonSearchbar 
+    <IonSearchbar
       placeholder="Find Journal"
-      value={searchTerm}
-      onIonChange={handleSearch}
+      value={value}
+      onIonInput={(e) => onChange(e.detail.value!)}
       debounce={300}
     />
   );
 }
-
 export default Searchbar;

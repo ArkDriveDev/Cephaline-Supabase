@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  IonCard, 
-  IonCardContent, 
-  IonCardHeader, 
-  IonCardTitle, 
+import {
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
+  IonCardTitle,
   IonSpinner
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
@@ -13,9 +13,10 @@ import './JournalCards.css';
 interface JournalCardsProps {
   journals: any[];
   setJournals: React.Dispatch<React.SetStateAction<any[]>>;
+  searchText: string;
 }
 
-const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) => {
+const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals, searchText }) => {
   const history = useHistory();
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +25,7 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) =>
       try {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (!user) throw new Error('User not authenticated');
 
         const { data, error } = await supabase
@@ -47,21 +48,18 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) =>
 
   const handleCardClick = async (journalId: string) => {
     try {
-      // First check if journal has any pages
       const { data: journalPages, error } = await supabase
         .from('journal_pages')
         .select('page_id')
         .eq('journal_id', journalId)
         .order('created_at', { ascending: false })
         .limit(1);
-  
+
       if (error) throw error;
-  
+
       if (journalPages && journalPages.length > 0) {
-        // If pages exist, go to Overview with the most recent pageId
         history.push(`/Cephaline-Supabase/app/Overviewing/${journalId}`);
       } else {
-        // If no pages, go to JournalPage to create first page
         history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
       }
     } catch (err) {
@@ -69,6 +67,11 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) =>
       history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
     }
   };
+
+  const filteredJournals = journals.filter(journal =>
+    journal.title.toLowerCase().includes(searchText.toLowerCase()) ||
+    journal.description?.toLowerCase().includes(searchText.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -79,17 +82,17 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) =>
     );
   }
 
-  if (journals.length === 0) {
+  if (filteredJournals.length === 0) {
     return (
       <div className="empty-state">
-        <p>You don't have any journals yet. Create one to get started!</p>
+        <p>No journals match your search.</p>
       </div>
     );
   }
 
   return (
     <div className="journal-grid-container">
-      {journals.map((journal) => {
+      {filteredJournals.map((journal) => {
         const cardStyle = {
           '--card-color': journal.card_color,
           '--title-color': journal.title_color
@@ -106,9 +109,9 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) =>
               <div className="journal-title-container">
                 <h3 className="journal-title">{journal.title}</h3>
                 <div className="journal-date">
-                  {new Date(journal.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    year: 'numeric' 
+                  {new Date(journal.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    year: 'numeric'
                   })}
                 </div>
               </div>
