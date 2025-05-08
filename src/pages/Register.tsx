@@ -216,7 +216,7 @@ const Register: React.FC = () => {
             </IonButton>
 
             <IonButton
-              routerLink="/cephaline-supabase"
+              routerLink="/Cephaline-Supabase"
               expand="block"
               fill="clear"
               shape="round"
@@ -274,7 +274,7 @@ const Register: React.FC = () => {
                   <p>Your account has been created successfully.</p>
                   <p>Please check your email address.</p>
                 </IonText>
-                <IonButton routerLink="/cephaline-supabase" routerDirection="back" color="primary">
+                <IonButton routerLink="/Cephaline-Supabase" routerDirection="back" color="primary">
                   Go to Login
                 </IonButton>
               </IonContent>
