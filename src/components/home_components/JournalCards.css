@@ -50,7 +50,7 @@
 .journal-grid-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   padding: 12px 0; /* Reduced from 18px 0 */
   align-items: flex-start;
   min-height: 180px; /* Reduced from 240px */
