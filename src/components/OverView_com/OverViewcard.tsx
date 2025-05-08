@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonCard,
   IonCardContent,
@@ -25,40 +25,53 @@ interface OverViewcardProps {
   journalId: string;
   journalTitle: string;
   journalDescription?: string;
-  onUpdate?: () => void; // Made optional
+  onUpdate?: () => void;
 }
 
 const OverViewcard: React.FC<OverViewcardProps> = ({ 
   journalId, 
   journalTitle, 
-  journalDescription, 
+  journalDescription = '', 
   onUpdate 
 }) => {
   const router = useIonRouter();
+  const [title, setTitle] = useState<string>(journalTitle || '');
+  const [description, setDescription] = useState<string>(journalDescription || '');
   const [showModal, setShowModal] = useState(false);
-  const [title, setTitle] = useState(journalTitle);
-  const [description, setDescription] = useState(journalDescription || '');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    setTitle(journalTitle || '');
+    setDescription(journalDescription || '');
+  }, [journalTitle, journalDescription]);
 
   const handleAddPage = () => {
     router.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
   };
 
   const handleOpenSettings = () => {
+    setTitle(journalTitle || '');
+    setDescription(journalDescription || '');
     setShowModal(true);
   };
 
   const handleUpdateJournal = async () => {
+    if (!title?.trim()) {
+      setToastMessage('Title cannot be empty');
+      setShowToast(true);
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const { error } = await supabase
         .from('journals')
         .update({ 
-          title, 
-          description,
+          title: title.trim(), 
+          description: description.trim(),
           updated_at: new Date().toISOString()
         })
         .eq('journal_id', journalId);
@@ -68,15 +81,14 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       setToastMessage('Journal updated successfully');
       setShowToast(true);
       
-      // Only call if provided
       if (onUpdate) {
         onUpdate();
       }
       setShowModal(false);
     } catch (error) {
+      console.error('Error updating journal:', error);
       setToastMessage('Failed to update journal');
       setShowToast(true);
-      console.error('Error updating journal:', error);
     } finally {
       setIsUpdating(false);
     }
@@ -94,14 +106,13 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       setToastMessage('Journal deleted successfully');
       setShowToast(true);
       
-      // Redirect after a short delay to show the toast
       setTimeout(() => {
         router.push('/Cephaline-Supabase/app/journals');
       }, 1000);
     } catch (error) {
+      console.error('Error deleting journal:', error);
       setToastMessage('Failed to delete journal');
       setShowToast(true);
-      console.error('Error deleting journal:', error);
     }
   };
 
@@ -154,11 +165,12 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
         </IonHeader>
         <IonContent className="ion-padding">
           <IonItem>
-            <IonLabel position="stacked">Title</IonLabel>
+            <IonLabel position="stacked">Title *</IonLabel>
             <IonInput
               value={title}
-              onIonChange={(e) => setTitle(e.detail.value!)}
+              onIonChange={(e) => setTitle(e.detail.value ?? '')}
               placeholder="Enter journal title"
+              clearInput
             />
           </IonItem>
           
@@ -166,7 +178,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
             <IonLabel position="stacked">Description</IonLabel>
             <IonTextarea
               value={description}
-              onIonChange={(e) => setDescription(e.detail.value!)}
+              onIonChange={(e) => setDescription(e.detail.value ?? '')}
               placeholder="Enter journal description"
               rows={4}
               autoGrow
@@ -177,7 +189,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
             <IonButton 
               expand="block" 
               onClick={handleUpdateJournal}
-              disabled={!title || isUpdating}
+              disabled={!title?.trim() || isUpdating}
             >
               {isUpdating ? 'Updating...' : 'Save Changes'}
             </IonButton>
@@ -203,7 +215,6 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
         ]}
       />
 
-      {/* Toast for feedback */}
       <IonToast
         isOpen={showToast}
         onDidDismiss={() => setShowToast(false)}

@@ -204,12 +204,6 @@ const JournalPageView: React.FC = () => {
             </IonText>
           )}
 
-          <IonText color="medium" className="content-meta">
-            <small>Created: {formatDate(item.created_at)}</small>
-            {item.updated_at !== item.created_at && (
-              <small> • Updated: {formatDate(item.updated_at)}</small>
-            )}
-          </IonText>
         </IonCardContent>
       </IonCard>
     );

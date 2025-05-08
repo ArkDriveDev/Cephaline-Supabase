@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  IonContent, 
-  IonHeader, 
-  IonPage, 
-  IonTitle, 
-  IonToolbar, 
-  IonList, 
-  IonItem, 
-  IonLabel, 
-  IonButtons, 
+import {
+  IonContent,
+  IonHeader,
+  IonPage,
+  IonTitle,
+  IonToolbar,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonButtons,
   IonBackButton,
   IonNote,
   IonBadge
@@ -66,10 +66,6 @@ const PageList: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start">
-            <IonBackButton defaultHref={`/Cephaline-Supabase/app/Overviewing/${journalId}`} />
-          </IonButtons>
-          <IonTitle>Page List</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent>
@@ -79,9 +75,12 @@ const PageList: React.FC = () => {
           <div className="ion-padding">No pages found for this journal.</div>
         ) : (
           <IonList>
+            <IonButtons slot="start">
+              <IonBackButton defaultHref={`/Cephaline-Supabase/app/Overviewing/${journalId}`} />
+            </IonButtons>
             {pages.map((page) => (
-              <IonItem 
-                key={page.page_id} 
+              <IonItem
+                key={page.page_id}
                 routerLink={`/Cephaline-Supabase/app/JournalPageView/${journalId}/${page.page_id}`} // Updated to use JournalPageView
                 detail
               >
