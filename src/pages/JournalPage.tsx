@@ -12,6 +12,7 @@ import {
   IonInput,
   IonCard,
   IonCardContent,
+  useIonRouter
 } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
@@ -32,6 +33,7 @@ interface Attachment {
 }
 
 const JournalPage: React.FC = () => {
+  const navigation = useIonRouter();
   const { journalId: rawJournalId } = useParams<{ journalId: string }>();
   const journalId = rawJournalId?.startsWith(':') ? rawJournalId.slice(1) : rawJournalId;
   
@@ -202,6 +204,7 @@ const JournalPage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+    navigation.push('/cephaline-supabase/app', 'forward', 'replace');
   };
 
   return (

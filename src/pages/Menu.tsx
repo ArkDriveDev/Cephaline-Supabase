@@ -11,7 +11,7 @@ import {
   IonPage,
   IonRouterOutlet,
   IonTitle,
-  IonToolbar
+  IonToolbar,
 } from '@ionic/react'
 import { homeOutline, informationOutline, logOutOutline, personCircleOutline, rocketOutline } from 'ionicons/icons';
 import { Redirect, Route } from 'react-router';
@@ -21,7 +21,9 @@ import JournalPage from './JournalPage';
 import Overviewing from './Overviewing';
 import PageList from './PageList';
 import JournalPageView from './JournalPageView';
+
 const Menu: React.FC = () => {
+
   const path = [
     { name: 'Home', url: '/Cephaline-Supabase/app/home', icon: homeOutline },
     { name: 'Profile', url: '/Cephaline-Supabase/app/editProfile', icon: personCircleOutline },
