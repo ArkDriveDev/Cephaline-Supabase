@@ -42,19 +42,51 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
     setTitle(journalTitle || '');
     setDescription(journalDescription || '');
   }, [journalTitle, journalDescription]);
 
+  const fetchJournalData = async () => {
+    setIsFetching(true);
+    try {
+      const { data, error } = await supabase
+        .from('journals')
+        .select('title, description')
+        .eq('journal_id', journalId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setTitle(data.title);
+        setDescription(data.description || '');
+      }
+    } catch (error) {
+      console.error('Error fetching journal data:', error);
+      setToastMessage('Failed to load journal data');
+      setShowToast(true);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
   const handleAddPage = () => {
     router.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
   };
 
-  const handleOpenSettings = () => {
+  const handleOpenSettings = async () => {
+    // Choose one approach:
+    
+    // 1. Use the props directly (faster, but might not be fresh)
     setTitle(journalTitle || '');
     setDescription(journalDescription || '');
+    
+    // 2. Fetch fresh data from Supabase (slower, but guaranteed fresh)
+    // await fetchJournalData();
+    
     setShowModal(true);
   };
 
@@ -135,9 +167,10 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
               color="medium" 
               onClick={handleOpenSettings}
               className="action-button"
+              disabled={isFetching}
             >
               <IonIcon slot="start" icon={settings} />
-              Settings
+              {isFetching ? 'Loading...' : 'Settings'}
             </IonButton>
           </div>
         </IonCardContent>
@@ -157,6 +190,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
               <IonButton 
                 color="danger" 
                 onClick={() => setShowDeleteAlert(true)}
+                disabled={isUpdating}
               >
                 <IonIcon slot="icon-only" icon={trash} />
               </IonButton>
@@ -169,7 +203,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
             <IonInput
               value={title}
               onIonChange={(e) => setTitle(e.detail.value ?? '')}
-              placeholder="Enter journal title"
+              placeholder="Enter new journal title"
               clearInput
             />
           </IonItem>
@@ -179,7 +213,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
             <IonTextarea
               value={description}
               onIonChange={(e) => setDescription(e.detail.value ?? '')}
-              placeholder="Enter journal description"
+              placeholder="Enter new journal description"
               rows={4}
               autoGrow
             />
