@@ -10,9 +10,13 @@ import { useHistory } from 'react-router-dom';
 import { supabase } from '../../utils/supaBaseClient';
 import './JournalCards.css';
 
-const JournalCards: React.FC = () => {
+interface JournalCardsProps {
+  journals: any[];
+  setJournals: React.Dispatch<React.SetStateAction<any[]>>;
+}
+
+const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals }) => {
   const history = useHistory();
-  const [journals, setJournals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,7 +43,7 @@ const JournalCards: React.FC = () => {
     };
 
     fetchJournals();
-  }, []);
+  }, [setJournals]);
 
   const handleCardClick = async (journalId: string) => {
     try {
@@ -55,14 +59,14 @@ const JournalCards: React.FC = () => {
   
       if (journalPages && journalPages.length > 0) {
         // If pages exist, go to Overview with the most recent pageId
-        history.push(`/cephaline-supabase/app/Overviewing/${journalId}`);
+        history.push(`/Cephaline-Supabase/app/Overviewing/${journalId}`);
       } else {
         // If no pages, go to JournalPage to create first page
-        history.push(`/cephaline-supabase/app/JournalPage/${journalId}`);
+        history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
       }
     } catch (err) {
       console.error('Error checking journal pages:', err);
-      history.push(`/cephaline-supabase/app/JournalPage/${journalId}`);
+      history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
     }
   };
 

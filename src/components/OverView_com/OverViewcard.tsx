@@ -16,11 +16,11 @@ const OverViewcard: React.FC<OverViewcardProps> = ({ journalId }) => {
   const router = useIonRouter();
 
   const handleAddPage = () => {
-    router.push(`/cephaline-supabase/app/JournalPage/${journalId}`);
+    router.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
   };
 
   const handleOpenSettings = () => {
-    router.push(`/cephaline-supabase/app/journal-settings/${journalId}`);
+    router.push(`/Cephaline-Supabase/app/journal-settings/${journalId}`);
   };
 
   return (

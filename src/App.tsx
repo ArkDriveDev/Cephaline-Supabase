@@ -42,9 +42,9 @@ const App: React.FC = () => (
   <IonApp>
     <IonReactRouter>
       <IonRouterOutlet>
-        <Route exact path="/cephaline-supabase" component={Login} />
-        <Route exact path="/cephaline-supabase/registration" component={Registration} />
-        <Route path="/cephaline-supabase/app" component={Menu} />
+        <Route exact path="/Cephaline-Supabase" component={Login} />
+        <Route exact path="/Cephaline-Supabase/registration" component={Registration} />
+        <Route path="/Cephaline-Supabase/app" component={Menu} />
       </IonRouterOutlet>
       
     </IonReactRouter>

@@ -110,7 +110,7 @@ import {
       <IonPage>
         <IonHeader>
           <IonToolbar>
-            <IonTitle style={h1Style}>Login</IonTitle>
+            <IonTitle style={h1Style}>Logins</IonTitle>
           </IonToolbar>
         </IonHeader>
         <IonContent className='ion-padding'>
@@ -190,7 +190,7 @@ import {
                   Login
                 </IonButton>
   
-                <IonButton routerLink="/cephaline-supabase/Registration" expand="full" fill="clear" shape="round" color="secondary">
+                <IonButton routerLink="/Cephaline-Supabase/Registration" expand="full" fill="clear" shape="round" color="secondary">
                   Don't have an account? Register here
                 </IonButton>
   

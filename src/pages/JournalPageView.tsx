@@ -134,11 +134,11 @@ const JournalPageView: React.FC = () => {
   };
 
   const handleEdit = () => {
-    history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}`);
+    history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}`);
   };
 
   const handleAddContent = () => {
-    history.push(`/cephaline-supabase/app/JournalPage/${journalId}/${pageId}/content`);
+    history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
   const renderContentItem = (item: ContentItem) => {

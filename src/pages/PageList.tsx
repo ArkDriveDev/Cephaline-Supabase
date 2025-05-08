@@ -67,7 +67,7 @@ const PageList: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} />
+            <IonBackButton defaultHref={`/Cephaline-Supabase/app/Overviewing/${journalId}`} />
           </IonButtons>
           <IonTitle>Page List</IonTitle>
         </IonToolbar>
@@ -82,7 +82,7 @@ const PageList: React.FC = () => {
             {pages.map((page) => (
               <IonItem 
                 key={page.page_id} 
-                routerLink={`/cephaline-supabase/app/JournalPageView/${journalId}/${page.page_id}`} // Updated to use JournalPageView
+                routerLink={`/Cephaline-Supabase/app/JournalPageView/${journalId}/${page.page_id}`} // Updated to use JournalPageView
                 detail
               >
                 <IonLabel>

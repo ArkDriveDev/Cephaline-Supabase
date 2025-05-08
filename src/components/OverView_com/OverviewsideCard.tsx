@@ -33,7 +33,7 @@ const OverviewSideCard: React.FC<OverviewSideCardProps> = ({ journalId }) => {
       return;
     }
 
-    const targetPath = `/cephaline-supabase/app/page-list/${journalId}`;
+    const targetPath = `/Cephaline-Supabase/app/page-list/${journalId}`;
     console.log('Attempting to navigate to:', targetPath); // Debug log
     
     router.push(targetPath);

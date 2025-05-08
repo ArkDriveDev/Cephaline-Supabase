@@ -23,8 +23,8 @@ import PageList from './PageList';
 import JournalPageView from './JournalPageView';
 const Menu: React.FC = () => {
   const path = [
-    { name: 'Home', url: '/cephaline-supabase/app/home', icon: homeOutline },
-    { name: 'Profile', url: '/cephaline-supabase/app/editProfile', icon: personCircleOutline },
+    { name: 'Home', url: '/Cephaline-Supabase/app/home', icon: homeOutline },
+    { name: 'Profile', url: '/Cephaline-Supabase/app/editProfile', icon: personCircleOutline },
   ]
 
   const glow = {
@@ -65,7 +65,7 @@ const Menu: React.FC = () => {
               </IonItem>
             </IonMenuToggle>
           ))}
-          <IonButton routerLink="/cephaline-supabase" routerDirection="back" expand="full"
+          <IonButton routerLink="/Cephaline-Supabase" routerDirection="back" expand="full"
             style={{
               marginTop: '10%',
               width: '90vw',
@@ -88,18 +88,18 @@ const Menu: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonRouterOutlet id="main">
-          <Route exact path="/cephaline-supabase/app/home" component={Home} />
-          <Route exact path="/cephaline-supabase/app/editProfile" component={EditProfile} />
-          <Route exact path="/cephaline-supabase/app/JournalPage/:journalId?" component={JournalPage} />
-          <Route exact path="/cephaline-supabase/app/page-list/:journalId" component={PageList} />
-          <Route exact path="/cephaline-supabase/app/JournalPageView/:journalId/:pageId" component={JournalPageView} />
+          <Route exact path="/Cephaline-Supabase/app/home" component={Home} />
+          <Route exact path="/Cephaline-Supabase/app/editProfile" component={EditProfile} />
+          <Route exact path="/Cephaline-Supabase/app/JournalPage/:journalId?" component={JournalPage} />
+          <Route exact path="/Cephaline-Supabase/app/page-list/:journalId" component={PageList} />
+          <Route exact path="/Cephaline-Supabase/app/JournalPageView/:journalId/:pageId" component={JournalPageView} />
           <Route
             exact
-            path="/cephaline-supabase/app/Overviewing/:journalId"
+            path="/Cephaline-Supabase/app/Overviewing/:journalId"
             component={Overviewing}
           />
-          <Route exact path="/cephaline-supabase/app">
-            <Redirect to="/cephaline-supabase/app/home" />
+          <Route exact path="/Cephaline-Supabase/app">
+            <Redirect to="/Cephaline-Supabase/app/home" />
           </Route>
         </IonRouterOutlet>
       </IonPage>

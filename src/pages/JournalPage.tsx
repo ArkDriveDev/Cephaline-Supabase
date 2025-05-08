@@ -209,7 +209,7 @@ const JournalPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/cephaline-supabase/app/journals" />
+            <IonBackButton defaultHref="/Cephaline-Supabase/app/journals" />
           </IonButtons>
           <IonTitle>New Journal Page</IonTitle>
         </IonToolbar>

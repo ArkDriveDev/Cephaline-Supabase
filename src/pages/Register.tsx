@@ -171,7 +171,7 @@ const Register: React.FC = () => {
             }}
           >
             <IonCardContent>
-              <h1 style={h1Style}>Create your account</h1>
+              <h1 style={h1Style}>Hey Create your account</h1>
 
               <IonInput label="Username" labelPlacement="stacked" fill="outline" type="text" placeholder="Enter a unique username" value={username} onIonChange={e => setUsername(e.detail.value!)} style={{
                 marginTop: '15px', boxShadow: '0 0 8px rgba(43, 174, 226, 0.8)',
@@ -260,7 +260,7 @@ const Register: React.FC = () => {
                     <p>Your account has been created successfully.</p>
                     <p>Please check your email address.</p>
                   </IonText>
-                  <IonButton routerLink="/cephaline-supabase" routerDirection="back" color="primary">
+                  <IonButton routerLink="/Cephaline-Supabase" routerDirection="back" color="primary">
                     Go to Login
                   </IonButton>
                 </IonContent>

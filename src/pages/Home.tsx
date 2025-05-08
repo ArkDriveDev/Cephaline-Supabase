@@ -1,9 +1,18 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonRouterOutlet } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
+import { useState } from 'react';
 import Profile from '../components/home_components/profile';
 import Searchbar from '../components/home_components/SearchBar';
 import NewButton from '../components/home_components/NewButton';
 import JournalCards from '../components/home_components/JournalCards';
+
 const Home: React.FC = () => {
+    const [journals, setJournals] = useState<any[]>([]);
+
+    // This function will be called when a new journal is created
+    const handleJournalCreated = (newJournal: any) => {
+        setJournals(prevJournals => [newJournal, ...prevJournals]);
+    };
+
     return (
         <IonPage>
             <IonHeader>
@@ -15,11 +24,10 @@ const Home: React.FC = () => {
                 <Profile />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Searchbar />
-                    <NewButton />
+                    <NewButton onJournalCreated={handleJournalCreated} />
                 </div>
-                <JournalCards />
+                <JournalCards journals={journals} setJournals={setJournals} />
             </IonContent>
-
         </IonPage>
     );
 };
