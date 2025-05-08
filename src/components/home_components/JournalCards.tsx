@@ -9,13 +9,13 @@ import {
 import { useHistory } from 'react-router-dom';
 import { supabase } from '../../utils/supaBaseClient';
 import './JournalCards.css';
-import { SortOption } from './SortOptions'; // Import the SortOption type
+import { SortOption } from './SortOptions';
 
 interface JournalCardsProps {
   journals: any[];
   setJournals: React.Dispatch<React.SetStateAction<any[]>>;
   searchText: string;
-  sortOption: SortOption; // Add sortOption to the props
+  sortOption: SortOption;
 }
 
 const JournalCards: React.FC<JournalCardsProps> = ({ 
@@ -54,29 +54,20 @@ const JournalCards: React.FC<JournalCardsProps> = ({
   }, [setJournals]);
 
   const sortedAndFilteredJournals = useMemo(() => {
-    // First filter the journals
     const filtered = journals.filter(journal =>
       journal.title.toLowerCase().includes(searchText.toLowerCase()) ||
       journal.description?.toLowerCase().includes(searchText.toLowerCase())
     );
 
-    // Then sort them according to the sortOption
     return [...filtered].sort((a, b) => {
       switch (sortOption) {
-        case 'title-asc':
-          return a.title.localeCompare(b.title);
-        case 'title-desc':
-          return b.title.localeCompare(a.title);
-        case 'date-newest':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case 'date-oldest':
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case 'color-asc':
-          return (a.card_color || '').localeCompare(b.card_color || '');
-        case 'color-desc':
-          return (b.card_color || '').localeCompare(a.card_color || '');
-        default:
-          return 0;
+        case 'title-asc': return a.title.localeCompare(b.title);
+        case 'title-desc': return b.title.localeCompare(a.title);
+        case 'date-newest': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'date-oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'color-asc': return (a.card_color || '').localeCompare(b.card_color || '');
+        case 'color-desc': return (b.card_color || '').localeCompare(a.card_color || '');
+        default: return 0;
       }
     });
   }, [journals, searchText, sortOption]);
@@ -92,7 +83,7 @@ const JournalCards: React.FC<JournalCardsProps> = ({
 
       if (error) throw error;
 
-      if (journalPages && journalPages.length > 0) {
+      if (journalPages?.length) {
         history.push(`/Cephaline-Supabase/app/Overviewing/${journalId}`);
       } else {
         history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
@@ -121,52 +112,53 @@ const JournalCards: React.FC<JournalCardsProps> = ({
   }
 
   return (
-    <div className="journal-grid-container">
-      {sortedAndFilteredJournals.map((journal) => {
-        const cardStyle = {
-          '--card-color': journal.card_color,
-          '--title-color': journal.title_color
-        } as React.CSSProperties;
-
-        return (
-          <div
-            key={journal.journal_id}
-            className="journal-card-wrapper"
-            style={cardStyle}
-            onClick={() => handleCardClick(journal.journal_id)}
-          >
-            <div className="journal-spine">
-              <div className="journal-title-container">
-                <h3 className="journal-title">{journal.title}</h3>
-                <div className="journal-date">
-                  {new Date(journal.created_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    year: 'numeric'
-                  })}
+    <div className="bookshelf-container">
+      <div className="bookshelf">
+        <div className="shelf"></div>
+        <div className="journal-grid-container">
+          {sortedAndFilteredJournals.map((journal) => (
+            <div
+              key={journal.journal_id}
+              className="journal-card-wrapper"
+              style={{
+                '--card-color': journal.card_color,
+                '--title-color': journal.title_color
+              } as React.CSSProperties}
+              onClick={() => handleCardClick(journal.journal_id)}
+            >
+              <div className="journal-spine">
+                <div className="journal-title-container">
+                  <h3 className="journal-title">{journal.title}</h3>
+                  <div className="journal-date">
+                    {new Date(journal.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="journal-card-preview">
-              <IonCard className="journal-card">
-                <IonCardHeader>
-                  <IonCardTitle style={{ color: journal.title_color }}>
-                    {journal.title}
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <p style={{ color: journal.description_color }}>
-                    {journal.description}
-                  </p>
-                  <small>
-                    Created: {new Date(journal.created_at).toLocaleDateString()}
-                  </small>
-                </IonCardContent>
-              </IonCard>
+              <div className="journal-card-preview">
+                <IonCard className="journal-card">
+                  <IonCardHeader>
+                    <IonCardTitle style={{ color: journal.title_color }}>
+                      {journal.title}
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <p style={{ color: journal.description_color }}>
+                      {journal.description}
+                    </p>
+                    <small>
+                      Created: {new Date(journal.created_at).toLocaleDateString()}
+                    </small>
+                  </IonCardContent>
+                </IonCard>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

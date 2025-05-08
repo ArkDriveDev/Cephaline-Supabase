@@ -1,206 +1,210 @@
-/* Updated CSS to fix the hover z-index issue */
+/* Bookshelf Container - WIDTH CONTROLS */
+.bookshelf-container {
+  padding: 10px; /* Reduced from 15px */
+  background: #4b4b4d;
+  max-width: 1880px; /* Added to constrain width */
+  max-height: 800x;
+  margin: 0 auto; /* Centers the shelf */
+}
+
+/* Main Bookshelf - HEIGHT CONTROLS */
+.bookshelf {
+  position: relative;
+  background: #626263;
+  background-image: 
+    linear-gradient(to bottom, #6a6c6d 0%, #166a91 20%, #313131 40%, #1d1d1c 60%, #70706f 80%, #3d3d3c 100%),
+    repeating-linear-gradient(to right, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 4px);
+  background-blend-mode: multiply;
+  border-radius: 6px; /* Reduced from 8px */
+  box-shadow: 
+    inset 0 5px 10px rgba(0,0,0,0.2),
+    inset 0 -5px 10px rgba(0,0,0,0.1),
+    0 3px 10px rgba(0,0,0,0.3);
+  padding: 15px 20px; /* Reduced from 25px 35px */
+  min-height: 200px; /* Reduced from 240px */
+}
+
+/* Shelf Edges - THICKNESS CONTROLS */
+.shelf {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px; /* Reduced from 12px */
+  background: linear-gradient(to bottom, #2e2e2e 0%, #474747 50%, #3d3d3d 100%);
+  box-shadow: 
+    inset 0 1px 3px rgba(255,255,255,0.2),
+    0 1px 2px rgba(0,0,0,0.3);
+}
+
+.shelf:first-child {
+  top: 0;
+  border-radius: 6px 6px 0 0; /* Matches parent radius */
+}
+
+.shelf:last-child {
+  bottom: 0;
+  border-radius: 0 0 6px 6px; /* Matches parent radius */
+}
+
+/* Journal Grid - CONTENT AREA CONTROLS */
 .journal-grid-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 10px;
-    align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 12px 0; /* Reduced from 18px 0 */
+  align-items: flex-start;
+  min-height: 180px; /* Reduced from 240px */
+  position: relative;
+}
+
+/* Journal Cards - BOOK SIZE CONTROLS */
+.journal-card-wrapper {
+  position: relative;
+  width: 50px; /* Reduced from 58px */
+  height: 180px; /* Reduced from 210px */
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-right: 0;
+  flex-shrink: 0;
+}
+
+.journal-spine {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--card-color);
+  border-radius: 3px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform-origin: left center;
+  transition: transform 0.3s ease;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+  z-index: 1;
+  border-right: 1px solid rgba(0,0,0,0.1);
+  background-image: 
+    linear-gradient(to right, rgba(255,255,255,0.1) 0%, transparent 5%),
+    repeating-linear-gradient(to right,
+      rgba(255,255,255,0.05) 0px,
+      rgba(255,255,255,0.05) 1px,
+      transparent 1px,
+      transparent 3px);
+  overflow: hidden;
+}
+
+.journal-card-preview {
+  position: absolute;
+  left: 45px; /* Adjusted from 48px */
+  top: 0;
+  width: 160px; /* Reduced from 175px */
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, left 0.3s ease;
+  z-index: 2;
+}
+
+/* Hover Effects */
+.journal-card-wrapper:hover {
+  transform: translateX(8px); /* Reduced from 9px */
+  z-index: 3;
+}
+
+.journal-card-wrapper:hover .journal-spine {
+  transform: perspective(800px) rotateY(-30deg);
+  z-index: 2;
+}
+
+.journal-card-wrapper:hover .journal-card-preview {
+  opacity: 1;
+  left: 50px; /* Adjusted from 53px */
+  z-index: 3;
+}
+
+/* Title and Date Styles */
+.journal-title-container {
+  transform: rotate(90deg) translateY(-4px);
+  width: 160px; /* Reduced from 175px */
+  text-align: center;
+}
+
+.journal-title {
+  color: var(--title-color);
+  font-size: 0.65rem; /* Reduced from 0.68rem */
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px; /* Reduced from 160px */
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  letter-spacing: 0.3px;
+}
+
+.journal-date {
+  color: rgba(51, 51, 51, 0.8);
+  font-size: 0.6rem; /* Reduced from 0.63rem */
+  margin-top: 4px; /* Reduced from 5px */
+}
+
+/* Card Preview Styles */
+.journal-card {
+  position: relative;
+  height: 100%;
+  margin: 0;
+  background-color: var(--card-color);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 3px 3px 0 0 rgba(49, 49, 49, 0.925);
+  padding: 10px; /* Reduced from 12px */
+  box-sizing: border-box;
+}
+
+/* Loading and Empty States */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 180px; /* Reduced from 200px */
+  color: #666;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 30px; /* Reduced from 40px */
+  color: #666;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .bookshelf-container {
+    padding: 8px; /* Smaller on mobile */
+  }
+  
+  .bookshelf {
+    padding: 12px 15px; /* Smaller on mobile */
+    min-height: 180px; /* Smaller on mobile */
+  }
+  
+  .journal-grid-container {
+    gap: 3px; /* Tighter on mobile */
+    min-height: 160px; /* Smaller on mobile */
   }
   
   .journal-card-wrapper {
-    position: relative;
-    width: 60px;
-    height: 220px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin-right: 1px;
-    flex-shrink: 0;
+    width: 45px; /* Narrower on mobile */
+    height: 160px; /* Shorter on mobile */
   }
   
-  /* Spine Styles - unchanged */
-  .journal-spine {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background-color: var(--card-color);
-    border-radius: 3px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transform-origin: left center;
-    transition: transform 0.3s ease;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-    z-index: 1; /* Changed from 2 to 1 */
-    border-right: 1px solid rgba(0,0,0,0.1);
-    background-image: 
-      linear-gradient(to right, 
-        rgba(255,255,255,0.1) 0%,
-        transparent 5%),
-      repeating-linear-gradient(to right,
-        rgba(255,255,255,0.05) 0px,
-        rgba(255,255,255,0.05) 1px,
-        transparent 1px,
-        transparent 3px);
-    overflow: hidden;
-  }
-  
-  /* Preview card positioning */
   .journal-card-preview {
-    position: absolute;
-    left: 50px;
-    top: 0;
-    width: 180px;
-    height: 100%;
-    opacity: 0;
-    pointer-events: none;
-    transition: 
-      opacity 0.3s ease,
-      left 0.3s ease;
-    z-index: 2; /* Higher than spine */
-  }
-  
-  /* Hover Effects - updated z-index */
-  .journal-card-wrapper:hover {
-    transform: translateX(10px);
-    z-index: 3; /* Ensures hovered item stays above others */
-  }
-  
-  .journal-card-wrapper:hover .journal-spine {
-    transform: perspective(800px) rotateY(-30deg);
-    z-index: 2;
+    width: 150px; /* Smaller on mobile */
+    left: 40px; /* Adjusted on mobile */
   }
   
   .journal-card-wrapper:hover .journal-card-preview {
-    opacity: 1;
-    left: 55px;
-    z-index: 3; /* Highest when hovered */
-  }
-  
-  /* The rest of your CSS remains exactly the same */
-  .journal-spine::after {
-    content: "";
-    position: absolute;
-    right: -5px;
-    top: 0;
-    bottom: 0;
-    width: 10px;
-    background: repeating-linear-gradient(
-      to right,
-      rgba(0,0,0,0.05) 0px,
-      rgba(0,0,0,0.05) 1px,
-      rgba(255,255,255,0.05) 1px,
-      rgba(255,255,255,0.05) 3px
-    );
-    z-index: 1;
-    border-radius: 0 3px 3px 0;
-  }
-  
-  .journal-spine::before {
-    content: "";
-    position: absolute;
-    left: 5px;
-    right: 5px;
-    height: 2px;
-    background: linear-gradient(
-      to right, 
-      rgba(0,0,0,0.1) 0%,
-      rgba(0,0,0,0.3) 50%,
-      rgba(0,0,0,0.1) 100%
-    );
-    z-index: 3;
-  }
-  .journal-spine::before { 
-    top: 5px;
-    box-shadow: 
-      0 -3px 0 rgba(255,255,255,0.1),
-      0 -6px 0 rgba(255,255,255,0.05);
+    left: 45px; /* Adjusted on mobile */
   }
   
   .journal-title-container {
-    transform: rotate(90deg) translateY(-5px);
-    width: 180px;
-    text-align: center;
+    width: 150px; /* Smaller on mobile */
   }
-  
-  .journal-title {
-    color: var(--title-color);
-    font-size: 0.7rem;
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 160px;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-    letter-spacing: 0.3px;
-  }
-  
-  .journal-date {
-    color: rgba(255,255,255,0.8);
-    font-size: 0.65rem;
-    margin-top: 6px;
-  }
-  
-  .journal-card {
-    position: relative;
-    height: 100%;
-    margin: 0;
-    background-color: var(--card-color);
-    border-radius: 0 4px 4px 0;
-    box-shadow: 3px 3px 0 0 rgba(133, 132, 132, 0.925);
-    padding: 15px;
-    box-sizing: border-box;
-  }
-  
-  .journal-card::before,
-  .journal-card::after {
-    content: "";
-    position: absolute;
-    left: 5px;
-    right: 5px;
-    height: 2px;
-    background: linear-gradient(
-      to right, 
-      rgba(0,0,0,0.1) 0%,
-      rgba(0,0,0,0.3) 50%,
-      rgba(0,0,0,0.1) 100%
-    );
-    z-index: 3;
-  }
-  .journal-card::before { 
-    top: 5px;
-    box-shadow: 
-      0 -3px 0 rgba(228, 218, 218, 0.1),
-      0 -6px 0 rgba(255,255,255,0.05);
-  }
-  .journal-card::after { 
-    bottom: 5px;
-    box-shadow: 
-      0 3px 0 rgba(255,255,255,0.1),
-      0 6px 0 rgba(255,255,255,0.05);
-  }
-  
-  .journal-card-wrapper:hover .journal-spine::after {
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .journal-grid-container {
-      justify-content: center;
-    }
-  }
-  
-  .loading-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 200px;
-  }
-  
-  .empty-state {
-    text-align: center;
-    padding: 40px;
-    color: #666;
-  }
+}
