@@ -7,10 +7,25 @@ import JournalCards from '../components/home_components/JournalCards';
 
 const Home: React.FC = () => {
     const [journals, setJournals] = useState<any[]>([]);
+    const [filteredJournals, setFilteredJournals] = useState<any[]>([]);
 
-    // This function will be called when a new journal is created
     const handleJournalCreated = (newJournal: any) => {
-        setJournals(prevJournals => [newJournal, ...prevJournals]);
+        setJournals(prev => [newJournal, ...prev]);
+        setFilteredJournals(prev => [newJournal, ...prev]);
+    };
+
+    const handleSearch = (searchTerm: string) => {
+        if (!searchTerm) {
+            setFilteredJournals(journals);
+            return;
+        }
+        
+        const filtered = journals.filter(journal => 
+            journal.title.toLowerCase().includes(searchTerm) || 
+            journal.description.toLowerCase().includes(searchTerm)
+        );
+        
+        setFilteredJournals(filtered);
     };
 
     return (
@@ -23,10 +38,10 @@ const Home: React.FC = () => {
             <IonContent>
                 <Profile />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Searchbar />
+                    <Searchbar onSearch={handleSearch} />
                     <NewButton onJournalCreated={handleJournalCreated} />
                 </div>
-                <JournalCards journals={journals} setJournals={setJournals} />
+                <JournalCards journals={filteredJournals} setJournals={setJournals} />
             </IonContent>
         </IonPage>
     );
