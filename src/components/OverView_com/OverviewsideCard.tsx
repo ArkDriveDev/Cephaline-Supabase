@@ -53,6 +53,8 @@ const OverviewSideCard: React.FC<OverviewSideCardProps> = ({ journalId }) => {
           <IonIcon icon={list} slot="start" />
           Page List
         </IonButton>
+
+        
       </IonCardContent>
     </IonCard>
   );

@@ -8,12 +8,14 @@ import {
   IonButtons,
   IonMenuButton,
   IonSpinner,
-  IonToast
+  IonToast,
+  useIonRouter
 } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import OverViewcard from '../components/OverView_com/OverViewcard';
 import OverviewSideCard from '../components/OverView_com/OverviewsideCard';
 import { supabase } from '../utils/supaBaseClient';
+import './Overviewing.css';
 
 const Overviewing: React.FC = () => {
   const { journalId } = useParams<{ journalId: string }>();
@@ -28,10 +30,13 @@ const Overviewing: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [firstPageId, setFirstPageId] = useState<string | null>(null);
+  const router = useIonRouter();
 
   useEffect(() => {
     if (journalId) {
       fetchJournalDetails();
+      fetchFirstPageId();
     }
   }, [journalId]);
 
@@ -60,6 +65,32 @@ const Overviewing: React.FC = () => {
       setShowToast(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFirstPageId = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('journal_pages')
+        .select('page_id')
+        .eq('journal_id', journalId)
+        .order('page_no', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      setFirstPageId(data?.page_id || null);
+    } catch (error) {
+      console.error('Error fetching first page:', error);
+    }
+  };
+
+  const handleBookClick = () => {
+    if (firstPageId) {
+      router.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${firstPageId}`);
+    } else {
+      setToastMessage('This journal has no pages yet');
+      setShowToast(true);
     }
   };
 
@@ -106,25 +137,26 @@ const Overviewing: React.FC = () => {
           <OverviewSideCard journalId={journalId} />
         </div>
 
-        {/* Book Cover View */}
+        {/* Clickable Book Cover View */}
         <div
-          className="journal-cover"
+          className="journal-cover clickable-book"
+          onClick={handleBookClick}
           style={{
             backgroundColor: colors.cardColor,
             padding: '16px',
             borderRadius: '12px',
-            marginBottom: '20px',
+            margin: '20px auto',
             boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-            transition: 'background-color 0.3s ease',
+            transition: 'all 0.3s ease',
             height: '650px',
             width: '500px',
-            marginLeft: '700px',
             position: 'relative',
             borderBottom: '4px solid #d3d3d3',
             borderRight: '4px solid #d3d3d3',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            cursor: 'pointer'
           }}
         >
           {/* Top Gray Line */}
@@ -141,10 +173,22 @@ const Overviewing: React.FC = () => {
 
           {/* Content */}
           <div style={{ paddingTop: '20px' }}>
-            <h1 style={{ color: colors.titleColor, marginBottom: '8px', textAlign: 'center' }}>
+            <h1 style={{ 
+              color: colors.titleColor, 
+              marginBottom: '8px', 
+              textAlign: 'center',
+              fontSize: '2rem',
+              fontWeight: 'bold'
+            }}>
               {journalTitle}
             </h1>
-            <p style={{ color: colors.descriptionColor, textAlign: 'center', marginTop: '50px' }}>
+            <p style={{ 
+              color: colors.descriptionColor, 
+              textAlign: 'center', 
+              marginTop: '50px',
+              fontSize: '1.2rem',
+              padding: '0 20px'
+            }}>
               {journalDescription}
             </p>
           </div>

@@ -53,7 +53,7 @@ const Login: React.FC = () => {
 
     setShowToast(true);
     setTimeout(() => {
-      navigation.push('/cephaline-supabase/app', 'forward', 'replace');
+      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
     }, 300);
   };
 
@@ -111,7 +111,7 @@ const Login: React.FC = () => {
               <IonButton
                 fill="clear"
                 expand="block"
-                routerLink="/cephaline-supabase/Registration"
+                routerLink="/Cephaline-Supabase/Registration"
                 color="primary"
               >
                 Don’t have an account? Register here

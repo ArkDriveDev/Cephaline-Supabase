@@ -12,14 +12,23 @@ import {
   IonInput,
   IonCard,
   IonCardContent,
-  useIonRouter
+  useIonRouter,
+  IonButton,
+  IonIcon,
+  IonAlert
 } from '@ionic/react';
+import { trashOutline } from 'ionicons/icons';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
 import Journalized from '../components/JournalPage_omponents/Journalized';
 import SavePage from '../components/JournalPage_omponents/SavePage';
 import Spectrum from '../components/JournalPage_omponents/Spectrum';
 import Attachments from '../components/JournalPage_omponents/Attachements';
+
+// UUID validation fallback (works without the uuid package)
+const isUUID = (id: string) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+};
 
 interface JournalBlock {
   type: 'paragraph' | 'link' | 'image' | 'file' | 'folder';
@@ -42,22 +51,38 @@ const JournalPage: React.FC = () => {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [present] = useIonToast();
+
+  // Early return if invalid journalId
+  if (!journalId || !isUUID(journalId)) {
+    return (
+      <IonPage>
+        <IonContent className="ion-padding">
+          <IonCard color="danger">
+            <IonCardContent>
+              Invalid Journal ID format. Please go back and try again.
+            </IonCardContent>
+          </IonCard>
+        </IonContent>
+      </IonPage>
+    );
+  }
 
   const handleFileUploadWithProgress = async (file: File) => {
     setIsUploading(true);
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       const userId = user?.id;
-  
+
       if (userError || !userId) {
         throw new Error('You must be logged in to upload files');
       }
-  
+
       const timestamp = Date.now();
       const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const filePath = `${userId}/${journalId}/${timestamp}_${sanitizedFileName}`;
-  
+
       const { data: uploadData, error } = await supabase.storage
         .from('journal-contents')
         .upload(filePath, file, {
@@ -65,13 +90,13 @@ const JournalPage: React.FC = () => {
           upsert: false,
           contentType: file.type
         });
-  
+
       if (error) throw error;
-  
+
       const { data: urlData } = supabase.storage
         .from('journal-contents')
         .getPublicUrl(filePath);
-  
+
       return urlData.publicUrl;
     } catch (error: any) {
       present({
@@ -94,7 +119,7 @@ const JournalPage: React.FC = () => {
         if (!uploadedUrl) return;
         contentUrl = uploadedUrl;
       }
-  
+
       setMarkdownContent(prev => prev + `\n${contentUrl}\n`);
     } catch (error) {
       present({
@@ -125,11 +150,6 @@ const JournalPage: React.FC = () => {
   };
 
   const validateInputs = (): boolean => {
-    if (!journalId) {
-      present({ message: 'Invalid journal selected', duration: 2000, color: 'danger' });
-      return false;
-    }
-
     if (!pageTitle.trim()) {
       present({ message: 'Page title cannot be empty', duration: 2000, color: 'warning' });
       return false;
@@ -170,7 +190,7 @@ const JournalPage: React.FC = () => {
           journal_id: journalId,
           page_title: pageTitle.trim(),
           page_no: nextPageNo,
-          mood: selectedMood // Store the selected mood
+          mood: selectedMood
         })
         .select()
         .single();
@@ -204,22 +224,101 @@ const JournalPage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-    navigation.push('/cephaline-supabase/app', 'forward', 'replace');
+    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+  };
+
+  const handleDeleteJournal = async () => {
+    try {
+      setIsSaving(true);
+
+      // First delete all files associated with this journal from storage
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const filesToDelete = `${user.id}/${journalId}`;
+        const { error: deleteFilesError } = await supabase.storage
+          .from('journal-contents')
+          .remove([filesToDelete]);
+
+        if (deleteFilesError) {
+          console.error('Error deleting files:', deleteFilesError);
+        }
+      }
+
+      // Then delete all pages in the journal
+      const { error: deletePagesError } = await supabase
+        .from('journal_pages')
+        .delete()
+        .eq('journal_id', journalId);
+      
+      if (deletePagesError) throw deletePagesError;
+
+      // Finally delete the journal itself
+      const { error: deleteJournalError } = await supabase
+        .from('journals')
+        .delete()
+        .eq('journal_id', journalId);
+      
+      if (deleteJournalError) throw deleteJournalError;
+
+      present({
+        message: 'Journal deleted successfully',
+        duration: 2000,
+        color: 'success'
+      });
+      
+      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+    } catch (error: any) {
+      present({
+        message: `Failed to delete journal: ${error.message}`,
+        duration: 3000,
+        color: 'danger'
+      });
+    } finally {
+      setIsSaving(false);
+      setShowDeleteAlert(false);
+    }
   };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start">
-            <IonBackButton defaultHref="/Cephaline-Supabase/app/journals" />
-          </IonButtons>
-          <IonTitle>New Journal Page</IonTitle>
+          {/* Empty toolbar to maintain your layout */}
         </IonToolbar>
       </IonHeader>
+
+      <IonAlert
+        isOpen={showDeleteAlert}
+        onDidDismiss={() => setShowDeleteAlert(false)}
+        header={'Delete Journal'}
+        message={'Are you sure you want to delete this journal and all its contents? This action cannot be undone.'}
+        buttons={[
+          {
+            text: 'Cancel',
+            role: 'cancel',
+            cssClass: 'secondary'
+          },
+          {
+            text: 'Delete',
+            handler: handleDeleteJournal
+          }
+        ]}
+      />
+
       <IonContent className="ion-padding">
         <IonCard style={{ marginBottom: '20px' }}>
           <IonCardContent>
+            {/* YOUR EXACT BUTTON LAYOUT PRESERVED */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1700px' }}>
+              <IonButtons slot="start">
+                <IonBackButton defaultHref="/Cephaline-Supabase/app/home" />
+              </IonButtons>
+              <IonButtons slot="end">
+                <IonButton color="danger" onClick={() => setShowDeleteAlert(true)}>
+                  <IonIcon slot="icon-only" icon={trashOutline} />
+                </IonButton>
+              </IonButtons>
+            </div>
             <p>Viewing journal entry <strong>{journalId}</strong></p>
             <IonItem>
               <IonInput

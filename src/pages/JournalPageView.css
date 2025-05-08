@@ -1,6 +1,6 @@
 /* JournalPageView.css */
 .journal-page-content {
-  --background: #f9f5e9; /* Parchment-like background */
+  --background: #e9f0f9; /* Parchment-like background */
   --ion-safe-area-top: 20px;
   --ion-safe-area-bottom: 20px;
 }
@@ -16,8 +16,8 @@
   
   /* Paper texture with subtle grain */
   background-image: 
-    linear-gradient(#f9f5e9 0.1em, transparent 0.1em),
-    radial-gradient(#d4d0c5 1px, transparent 1px);
+    linear-gradient(#e9f4f9 0.1em, transparent 0.1em),
+    radial-gradient(#c5ced4 1px, transparent 1px);
   background-size: 
     100% 1.2em,
     10px 10px;

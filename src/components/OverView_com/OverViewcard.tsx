@@ -43,6 +43,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isFetching, setIsFetching] = useState(false);
+  const navigation = useIonRouter();
 
   useEffect(() => {
     setTitle(journalTitle || '');
@@ -146,6 +147,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       setToastMessage('Failed to delete journal');
       setShowToast(true);
     }
+    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
   };
 
   return (
