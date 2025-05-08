@@ -26,9 +26,9 @@ const Home: React.FC = () => {
                 <Profile />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Searchbar value={searchText} onChange={setSearchText} />
-                    <SortOptions value={sortOption} onChange={setSortOption} />
                     <NewButton onJournalCreated={handleJournalCreated} />
                 </div>
+                <SortOptions value={sortOption} onChange={setSortOption} />
                 <JournalCards
                     journals={journals}
                     setJournals={setJournals}

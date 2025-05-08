@@ -84,13 +84,24 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
       alignItems: 'flex-start', 
       width: '100%',
       margin: '30px 0 50px 0',
-      padding: '0 16px'
+      padding: '0 16px',
+      '--inner-padding-end': '0'
     }}>
       <IonLabel>Mood Spectrum</IonLabel>
-      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+      
+      {/* Mood slider */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        width: '100%',
+        margin: '8px 0'
+      }}>
         <IonIcon 
           icon={currentMood.icon} 
-          style={{ color: currentMood.color }} 
+          style={{ 
+            color: currentMood.color,
+            minWidth: '24px' // Prevent icon from shrinking
+          }} 
         />
         <IonRange
           min={0}
@@ -106,13 +117,20 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
         />
         <IonIcon 
           icon={currentMood.icon} 
-          style={{ color: currentMood.color }} 
+          style={{ 
+            color: currentMood.color,
+            minWidth: '24px' // Prevent icon from shrinking
+          }} 
         />
       </div>
+      
+      {/* Mood icons - will wrap on small screens */}
       <div style={{ 
         display: 'flex', 
+        flexWrap: 'wrap',
         justifyContent: 'space-between', 
         width: '100%',
+        gap: '8px',
         marginTop: '8px'
       }}>
         {moodLevels.map((level, index) => (
@@ -122,7 +140,9 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              flex: '1 0 calc(20% - 8px)',
+              minWidth: '60px' // Minimum width for each icon container
             }}
             onClick={() => handleIconClick(index)}
           >
@@ -130,26 +150,30 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
               icon={level.icon} 
               style={{ 
                 color: level.level === currentMood.level ? level.color : '#cccccc', 
-                fontSize: '24px', // Slightly larger for better touch targets
-                padding: '8px' // Adds more touch area
+                fontSize: '24px',
+                padding: '4px'
               }} 
             />
             <span style={{ 
               fontSize: '10px', 
               marginTop: '4px',
-              color: level.level === currentMood.level ? level.color : '#666666'
+              color: level.level === currentMood.level ? level.color : '#666666',
+              textAlign: 'center',
+              wordBreak: 'break-word'
             }}>
               {level.display}
             </span>
           </div>
         ))}
       </div>
+      
       <IonLabel style={{ 
         fontSize: '14px', 
         marginTop: '12px',
-        margin: '10px',
         color: currentMood.color,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        width: '100%',
+        textAlign: 'center'
       }}>
         Current Mood: {currentMood.display}
       </IonLabel>
