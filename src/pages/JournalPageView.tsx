@@ -20,14 +20,14 @@ import {
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
-import { 
-  chevronBack, 
-  chevronForward, 
-  createOutline, 
-  addOutline, 
-  linkOutline, 
-  documentOutline, 
-  imageOutline, 
+import {
+  chevronBack,
+  chevronForward,
+  createOutline,
+  addOutline,
+  linkOutline,
+  documentOutline,
+  imageOutline,
   folderOutline,
   happyOutline,
   sadOutline,
@@ -67,14 +67,16 @@ const JournalPageView: React.FC = () => {
   const [page, setPage] = useState<any>(null);
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adjacentPages, setAdjacentPages] = useState<{prev: string | null, next: string | null}>({prev: null, next: null});
+  const [adjacentPages, setAdjacentPages] = useState<{ prev: string | null, next: string | null }>({ prev: null, next: null });
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
   const history = useHistory();
 
   useEffect(() => {
     const fetchPageData = async () => {
       try {
         setLoading(true);
-        
+
         const { data: pageData, error: pageError } = await supabase
           .from('journal_pages')
           .select('*')
@@ -141,6 +143,22 @@ const JournalPageView: React.FC = () => {
     history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
+  const navigateWithSlide = (direction: 'prev' | 'next') => {
+    if (isAnimating) return;
+
+    const targetPageId = direction === 'prev' ? adjacentPages.prev : adjacentPages.next;
+    if (!targetPageId) return;
+
+    setIsAnimating(true);
+    setSlideDirection(direction === 'prev' ? 'right' : 'left');
+
+    setTimeout(() => {
+      history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${targetPageId}`);
+      setIsAnimating(false);
+      setSlideDirection(null);
+    }, 300);
+  };
+
   const renderContentItem = (item: ContentItem) => {
     const getIcon = () => {
       if (item.paragraph) return documentOutline;
@@ -166,8 +184,8 @@ const JournalPageView: React.FC = () => {
 
           {item.image_url && (
             <div className="content-image">
-              <IonImg 
-                src={item.image_url} 
+              <IonImg
+                src={item.image_url}
                 alt={`Content ${item.content_order}`}
                 style={{ maxHeight: '300px', objectFit: 'contain' }}
               />
@@ -175,9 +193,9 @@ const JournalPageView: React.FC = () => {
           )}
 
           {item.link && (
-            <IonButton 
-              fill="clear" 
-              href={item.link} 
+            <IonButton
+              fill="clear"
+              href={item.link}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -187,9 +205,9 @@ const JournalPageView: React.FC = () => {
           )}
 
           {item.file_url && (
-            <IonButton 
-              fill="clear" 
-              href={item.file_url} 
+            <IonButton
+              fill="clear"
+              href={item.file_url}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -203,7 +221,6 @@ const JournalPageView: React.FC = () => {
               <p>Folder: {item.folder_name}</p>
             </IonText>
           )}
-
         </IonCardContent>
       </IonCard>
     );
@@ -239,9 +256,6 @@ const JournalPageView: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start">
-            <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} />
-          </IonButtons>
           <IonTitle>Page {page.page_no}</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={handleAddContent}>
@@ -255,70 +269,74 @@ const JournalPageView: React.FC = () => {
       </IonHeader>
 
       <IonContent className="journal-page-content">
-        <div className="journal-page-container">
-          <div className="journal-page-header">
-            <h1>{page.page_title}</h1>
-            {page.mood && (
-              <div className="mood-display">
-                <IonIcon 
-                  icon={getMoodIcon(page.mood)} 
-                  style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }} 
-                />
-                <IonBadge color="tertiary">
-                  {page.mood.charAt(0).toUpperCase() + page.mood.slice(1)}
-                </IonBadge>
+        <div className={`slide-container ${slideDirection ? 'slide-' + slideDirection : ''}`}>
+          <div className="journal-page-container">
+          <IonButtons slot="start">
+              <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} style={{color:'skyblue'}}/>
+            </IonButtons>
+            <div className="journal-page-header">
+              <h1>{page.page_title}</h1>
+              {page.mood && (
+                <div className="mood-display">
+                  <IonIcon
+                    icon={getMoodIcon(page.mood)}
+                    style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }}
+                  />
+                  <IonBadge color="tertiary">
+                    {page.mood.charAt(0).toUpperCase() + page.mood.slice(1)}
+                  </IonBadge>
+                </div>
+              )}
+              <div className="page-metadata">
+                <IonText color="medium">
+                  <small>Created: {formatDate(page.created_at)}</small>
+                  {page.updated_at !== page.created_at && (
+                    <small> • Updated: {formatDate(page.updated_at)}</small>
+                  )}
+                </IonText>
               </div>
-            )}
-            <div className="page-metadata">
-              <IonText color="medium">
-                <small>Created: {formatDate(page.created_at)}</small>
-                {page.updated_at !== page.created_at && (
-                  <small> • Updated: {formatDate(page.updated_at)}</small>
-                )}
-              </IonText>
             </div>
-          </div>
+            <div className="contents-section">
+              <h2 className="contents-title">
+                Page Contents
+                <IonBadge color="primary" style={{ marginLeft: '8px' }}>
+                  {contents.length}
+                </IonBadge>
+              </h2>
 
-          <div className="contents-section">
-            <h2 className="contents-title">
-              Page Contents
-              <IonBadge color="primary" style={{ marginLeft: '8px' }}>
-                {contents.length}
-              </IonBadge>
-            </h2>
+              {contents.length === 0 ? (
+                <div className="empty-contents">
+                  <IonText color="medium">No content items yet.</IonText>
+                  <IonButton fill="clear" onClick={handleAddContent}>
+                    Add Content
+                  </IonButton>
+                </div>
+              ) : (
+                <div className="contents-list">
+                  {contents.map(renderContentItem)}
+                </div>
+              )}
+            </div>
 
-            {contents.length === 0 ? (
-              <div className="empty-contents">
-                <IonText color="medium">No content items yet.</IonText>
-                <IonButton fill="clear" onClick={handleAddContent}>
-                  Add Content
-                </IonButton>
-              </div>
-            ) : (
-              <div className="contents-list">
-                {contents.map(renderContentItem)}
-              </div>
-            )}
-          </div>
+            <div className="page-navigation">
+              <IonButton
+                fill="clear"
+                disabled={!adjacentPages.prev || isAnimating}
+                onClick={() => navigateWithSlide('prev')}
+              >
+                <IonIcon slot="start" icon={chevronBack} />
+                Previous
+              </IonButton>
 
-          <div className="page-navigation">
-            <IonButton 
-              fill="clear" 
-              disabled={!adjacentPages.prev}
-              onClick={() => adjacentPages.prev && history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${adjacentPages.prev}`)}
-            >
-              <IonIcon slot="start" icon={chevronBack} />
-              Previous
-            </IonButton>
-            
-            <IonButton 
-              fill="clear" 
-              disabled={!adjacentPages.next}
-              onClick={() => adjacentPages.next && history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${adjacentPages.next}`)}
-            >
-              Next
-              <IonIcon slot="end" icon={chevronForward} />
-            </IonButton>
+              <IonButton
+                fill="clear"
+                disabled={!adjacentPages.next || isAnimating}
+                onClick={() => navigateWithSlide('next')}
+              >
+                Next
+                <IonIcon slot="end" icon={chevronForward} />
+              </IonButton>
+            </div>
           </div>
         </div>
       </IonContent>
