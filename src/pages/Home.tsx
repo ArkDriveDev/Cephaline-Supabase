@@ -4,10 +4,12 @@ import Profile from '../components/home_components/profile';
 import Searchbar from '../components/home_components/SearchBar';
 import NewButton from '../components/home_components/NewButton';
 import JournalCards from '../components/home_components/JournalCards';
+import SortOptions, { SortOption } from '../components/home_components/SortOptions';
 
 const Home: React.FC = () => {
     const [journals, setJournals] = useState<any[]>([]);
-    const [searchText, setSearchText] = useState(''); // <-- Add this
+    const [searchText, setSearchText] = useState('');
+    const [sortOption, setSortOption] = useState<SortOption>('date-newest');
 
     const handleJournalCreated = (newJournal: any) => {
         setJournals(prevJournals => [newJournal, ...prevJournals]);
@@ -24,15 +26,18 @@ const Home: React.FC = () => {
                 <Profile />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Searchbar value={searchText} onChange={setSearchText} />
+                    <SortOptions value={sortOption} onChange={setSortOption} />
                     <NewButton onJournalCreated={handleJournalCreated} />
                 </div>
                 <JournalCards
                     journals={journals}
                     setJournals={setJournals}
                     searchText={searchText}
+                    sortOption={sortOption}
                 />
             </IonContent>
         </IonPage>
     );
 };
+
 export default Home;

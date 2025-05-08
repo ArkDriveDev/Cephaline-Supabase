@@ -13,6 +13,7 @@ function Searchbar({ value, onChange }: SearchbarProps) {
       value={value}
       onIonInput={(e) => onChange(e.detail.value!)}
       debounce={300}
+      style={{width:'1500px'}}
     />
   );
 }

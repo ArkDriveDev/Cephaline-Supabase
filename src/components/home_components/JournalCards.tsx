@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   IonCard,
   IonCardContent,
@@ -9,14 +9,21 @@ import {
 import { useHistory } from 'react-router-dom';
 import { supabase } from '../../utils/supaBaseClient';
 import './JournalCards.css';
+import { SortOption } from './SortOptions'; // Import the SortOption type
 
 interface JournalCardsProps {
   journals: any[];
   setJournals: React.Dispatch<React.SetStateAction<any[]>>;
   searchText: string;
+  sortOption: SortOption; // Add sortOption to the props
 }
 
-const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals, searchText }) => {
+const JournalCards: React.FC<JournalCardsProps> = ({ 
+  journals, 
+  setJournals, 
+  searchText,
+  sortOption 
+}) => {
   const history = useHistory();
   const [loading, setLoading] = useState(true);
 
@@ -46,6 +53,34 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals, sear
     fetchJournals();
   }, [setJournals]);
 
+  const sortedAndFilteredJournals = useMemo(() => {
+    // First filter the journals
+    const filtered = journals.filter(journal =>
+      journal.title.toLowerCase().includes(searchText.toLowerCase()) ||
+      journal.description?.toLowerCase().includes(searchText.toLowerCase())
+    );
+
+    // Then sort them according to the sortOption
+    return [...filtered].sort((a, b) => {
+      switch (sortOption) {
+        case 'title-asc':
+          return a.title.localeCompare(b.title);
+        case 'title-desc':
+          return b.title.localeCompare(a.title);
+        case 'date-newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'date-oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'color-asc':
+          return (a.card_color || '').localeCompare(b.card_color || '');
+        case 'color-desc':
+          return (b.card_color || '').localeCompare(a.card_color || '');
+        default:
+          return 0;
+      }
+    });
+  }, [journals, searchText, sortOption]);
+
   const handleCardClick = async (journalId: string) => {
     try {
       const { data: journalPages, error } = await supabase
@@ -68,11 +103,6 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals, sear
     }
   };
 
-  const filteredJournals = journals.filter(journal =>
-    journal.title.toLowerCase().includes(searchText.toLowerCase()) ||
-    journal.description?.toLowerCase().includes(searchText.toLowerCase())
-  );
-
   if (loading) {
     return (
       <div className="loading-container">
@@ -82,7 +112,7 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals, sear
     );
   }
 
-  if (filteredJournals.length === 0) {
+  if (sortedAndFilteredJournals.length === 0) {
     return (
       <div className="empty-state">
         <p>No journals match your search.</p>
@@ -92,7 +122,7 @@ const JournalCards: React.FC<JournalCardsProps> = ({ journals, setJournals, sear
 
   return (
     <div className="journal-grid-container">
-      {filteredJournals.map((journal) => {
+      {sortedAndFilteredJournals.map((journal) => {
         const cardStyle = {
           '--card-color': journal.card_color,
           '--title-color': journal.title_color
