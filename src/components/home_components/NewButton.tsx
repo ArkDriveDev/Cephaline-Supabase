@@ -115,7 +115,7 @@ const NewButton: React.FC<NewButtonProps> = ({ onJournalCreated }) => {
         onClick={() => setShowModal(true)} 
         expand="block" 
         color="primary"
-        style={{ margin: '0 10px' }}
+        style={{ margin: '0 10px',width:'100px'}}
       >
         <IonIcon slot="start" icon={bookOutline} />
         New Journal
@@ -140,7 +140,7 @@ const NewButton: React.FC<NewButtonProps> = ({ onJournalCreated }) => {
         </IonHeader>
 
         <IonContent className="ion-padding">
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
             {/* Journal Title Input */}
             <IonItem>
               <IonLabel position="stacked" color="primary">

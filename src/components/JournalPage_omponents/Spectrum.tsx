@@ -1,7 +1,7 @@
 import React from 'react';
 import { IonRange, IonItem, IonLabel, IonIcon } from '@ionic/react';
 import { happy, sad, heart, removeCircle, alertCircle } from 'ionicons/icons';
-import { useState} from 'react';
+import { useState } from 'react';
 
 interface SpectrumProps {
   selectedMood: string | null;
@@ -72,6 +72,12 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
     onMoodChange(mood.level);
   };
 
+  const handleIconClick = (levelIndex: number) => {
+    const value = levelIndex * 20 + 10; // Center of the range
+    setSliderValue(value);
+    onMoodChange(moodLevels[levelIndex].level);
+  };
+
   return (
     <IonItem lines="none" style={{ 
       flexDirection: 'column', 
@@ -82,7 +88,10 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
     }}>
       <IonLabel>Mood Spectrum</IonLabel>
       <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-        <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
+        <IonIcon 
+          icon={currentMood.icon} 
+          style={{ color: currentMood.color }} 
+        />
         <IonRange
           min={0}
           max={100}
@@ -95,7 +104,10 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
               ${moodLevels.map(level => `${level.color} ${level.min}%, ${level.color} ${level.max}%`).join(', ')}`
           }}
         />
-        <IonIcon icon={currentMood.icon} style={{ color: currentMood.color }} />
+        <IonIcon 
+          icon={currentMood.icon} 
+          style={{ color: currentMood.color }} 
+        />
       </div>
       <div style={{ 
         display: 'flex', 
@@ -103,13 +115,23 @@ const Spectrum: React.FC<SpectrumProps> = ({ selectedMood, onMoodChange }) => {
         width: '100%',
         marginTop: '8px'
       }}>
-        {moodLevels.map(level => (
-          <div key={level.level} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {moodLevels.map((level, index) => (
+          <div 
+            key={level.level} 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center',
+              cursor: 'pointer'
+            }}
+            onClick={() => handleIconClick(index)}
+          >
             <IonIcon 
               icon={level.icon} 
               style={{ 
                 color: level.level === currentMood.level ? level.color : '#cccccc', 
-                fontSize: '16px' 
+                fontSize: '24px', // Slightly larger for better touch targets
+                padding: '8px' // Adds more touch area
               }} 
             />
             <span style={{ 

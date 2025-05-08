@@ -16,7 +16,7 @@ interface SortOptionsProps {
 
 const SortOptions: React.FC<SortOptionsProps> = ({ value, onChange }) => {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '-3px', marginBottom: '4px' }}>
       <IonLabel>Sort by:</IonLabel>
       <IonSelect
         value={value}
