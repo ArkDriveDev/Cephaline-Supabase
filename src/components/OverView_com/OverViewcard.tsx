@@ -129,25 +129,87 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
 
   const handleDeleteJournal = async () => {
     try {
-      const { error } = await supabase
+      // 1. First delete all associated files from storage
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // List all files in the journal's folder
+        const { data: files, error: listError } = await supabase.storage
+          .from('journal-contents')
+          .list(`${user.id}/${journalId}`);
+        
+        if (listError) throw listError;
+  
+        // Delete all files if they exist
+        if (files && files.length > 0) {
+          const filesToDelete = files.map(file => 
+            `${user.id}/${journalId}/${file.name}`
+          );
+          
+          const { error: deleteFilesError } = await supabase.storage
+            .from('journal-contents')
+            .remove(filesToDelete);
+  
+          if (deleteFilesError) throw deleteFilesError;
+        }
+  
+        // Delete the folder itself (optional)
+        await supabase.storage
+          .from('journal-contents')
+          .remove([`${user.id}/${journalId}`]);
+      }
+  
+      // 2. Get all page IDs for this journal
+      const { data: pages, error: pagesError } = await supabase
+        .from('journal_pages')
+        .select('page_id')
+        .eq('journal_id', journalId);
+  
+      if (pagesError) throw pagesError;
+  
+      // 3. Delete all page contents (if any pages exist)
+      if (pages && pages.length > 0) {
+        const pageIds = pages.map(page => page.page_id);
+        
+        const { error: contentsError } = await supabase
+          .from('journal_page_contents')
+          .delete()
+          .in('page_id', pageIds);
+  
+        if (contentsError) throw contentsError;
+      }
+  
+      // 4. Delete all pages
+      const { error: pagesDeleteError } = await supabase
+        .from('journal_pages')
+        .delete()
+        .eq('journal_id', journalId);
+  
+      if (pagesDeleteError) throw pagesDeleteError;
+  
+      // 5. Finally delete the journal itself
+      const { error: journalDeleteError } = await supabase
         .from('journals')
         .delete()
         .eq('journal_id', journalId);
-
-      if (error) throw error;
-
-      setToastMessage('Journal deleted successfully');
+  
+      if (journalDeleteError) throw journalDeleteError;
+  
+      // Show success message
+      setToastMessage('Journal and all contents deleted successfully');
       setShowToast(true);
       
+      // Navigate after a brief delay
       setTimeout(() => {
         router.push('/Cephaline-Supabase/app/journals');
       }, 1000);
+      
     } catch (error) {
       console.error('Error deleting journal:', error);
-      setToastMessage('Failed to delete journal');
+      setToastMessage('Failed to delete journal. Please try again.');
       setShowToast(true);
+    } finally {
+      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
     }
-    navigation.push('/Cephaline-Supabase/app/home', 'forward', 'replace');
   };
 
   return (

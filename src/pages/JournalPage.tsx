@@ -309,7 +309,7 @@ const JournalPage: React.FC = () => {
         <IonCard style={{ marginBottom: '20px' }}>
           <IonCardContent>
             {/* YOUR EXACT BUTTON LAYOUT PRESERVED */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1700px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%'}}>
               <IonButtons slot="start">
                 <IonBackButton defaultHref="/Cephaline-Supabase/app/home" />
               </IonButtons>
