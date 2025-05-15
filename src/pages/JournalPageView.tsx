@@ -35,11 +35,11 @@ import {
   alertOutline,
   thumbsUpOutline,
   thumbsDownOutline,
-  helpOutline
+  helpOutline,
+  downloadOutline // ✅ added here
 } from 'ionicons/icons';
 import './JournalPageView.css';
 
-// Mood to icon mapping
 const moodIcons: Record<string, any> = {
   happy: happyOutline,
   sad: sadOutline,
@@ -271,11 +271,20 @@ const JournalPageView: React.FC = () => {
       <IonContent className="journal-page-content">
         <div className={`slide-container ${slideDirection ? 'slide-' + slideDirection : ''}`}>
           <div className="journal-page-container">
-          <IonButtons slot="start">
-              <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} style={{color:'skyblue'}}/>
+            <IonButtons slot="start">
+              <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} style={{ color: 'skyblue' }} />
             </IonButtons>
+
             <div className="journal-page-header">
-              <h1>{page.page_title}</h1>
+              {/* ✅ Title + Download button */}
+              <div className="page-title-with-download" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h1 style={{ margin: 0 }}>{page.page_title}</h1>
+                <IonButton fill="clear" size="small" style={{ padding: 0 }}>
+                  <IonIcon icon={downloadOutline} slot="start" />
+                  <IonText>Download</IonText>
+                </IonButton>
+              </div>
+
               {page.mood && (
                 <div className="mood-display">
                   <IonIcon
@@ -287,6 +296,7 @@ const JournalPageView: React.FC = () => {
                   </IonBadge>
                 </div>
               )}
+
               <div className="page-metadata">
                 <IonText color="medium">
                   <small>Created: {formatDate(page.created_at)}</small>
@@ -296,6 +306,7 @@ const JournalPageView: React.FC = () => {
                 </IonText>
               </div>
             </div>
+
             <div className="contents-section">
               <h2 className="contents-title">
                 Page Contents
