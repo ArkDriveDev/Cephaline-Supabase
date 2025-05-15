@@ -37,7 +37,7 @@ const Menu: React.FC = () => {
   const h1Style = {
     ...glow,
     animationDelay: '0.1s',
-    color: 'white',
+    color: 'black',
   };
   const h2Style = {
     display: 'flex',

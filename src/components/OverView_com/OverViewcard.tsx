@@ -147,7 +147,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       setToastMessage('Failed to delete journal');
       setShowToast(true);
     }
-    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+    navigation.push('/Cephaline-Supabase/app/home', 'forward', 'replace');
   };
 
   return (

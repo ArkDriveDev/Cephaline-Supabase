@@ -1,4 +1,4 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, useIonViewWillEnter } from '@ionic/react';
 import { useState } from 'react';
 import Profile from '../components/home_components/profile';
 import Searchbar from '../components/home_components/SearchBar';
@@ -10,10 +10,16 @@ const Home: React.FC = () => {
     const [journals, setJournals] = useState<any[]>([]);
     const [searchText, setSearchText] = useState('');
     const [sortOption, setSortOption] = useState<SortOption>('date-newest');
+    const [refreshKey, setRefreshKey] = useState(0); // Add refresh key
 
     const handleJournalCreated = (newJournal: any) => {
         setJournals(prevJournals => [newJournal, ...prevJournals]);
     };
+
+    // This will run every time the page is about to enter (including when coming back from another page)
+    useIonViewWillEnter(() => {
+        setRefreshKey(prevKey => prevKey + 1); // Force refresh
+    });
 
     return (
         <IonPage>
@@ -30,6 +36,7 @@ const Home: React.FC = () => {
                 </div>
                 <SortOptions value={sortOption} onChange={setSortOption} />
                 <JournalCards
+                    key={refreshKey} // This will force remount when refreshKey changes
                     journals={journals}
                     setJournals={setJournals}
                     searchText={searchText}
