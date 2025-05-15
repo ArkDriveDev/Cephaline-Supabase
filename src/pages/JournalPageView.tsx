@@ -18,7 +18,8 @@ import {
   IonCardContent,
   IonItem,
   IonLabel,
-  IonActionSheet
+  IonActionSheet,
+  useIonToast
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
@@ -66,6 +67,7 @@ interface ContentItem {
   updated_at: string;
 }
 
+
 const JournalPageView: React.FC = () => {
   const { journalId, pageId } = useParams<{ journalId: string, pageId: string }>();
   const [page, setPage] = useState<any>(null);
@@ -76,6 +78,7 @@ const JournalPageView: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [uploadingToDrive, setUploadingToDrive] = useState(false);
+  const [present] = useIonToast();
   const history = useHistory();
 
   useEffect(() => {
@@ -117,13 +120,18 @@ const JournalPageView: React.FC = () => {
 
       } catch (error) {
         console.error('Error fetching page:', error);
+        present({
+          message: 'Failed to load page data',
+          duration: 3000,
+          color: 'danger'
+        });
       } finally {
         setLoading(false);
       }
     };
 
     if (journalId && pageId) fetchPageData();
-  }, [journalId, pageId]);
+  }, [journalId, pageId, present]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -149,62 +157,104 @@ const JournalPageView: React.FC = () => {
     history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
+  interface ContentEntry {
+    order: number;
+    type: string;
+    data: string | null;
+    downloadError?: string;
+  }
+  
   const createZipFile = async () => {
+    if (!page) throw new Error('Page data not loaded');
+    
     const zip = new JSZip();
-    const folderName = page.page_title || 'journal-page';
-    
-    // Add all content to the zip
-    const folder = zip.folder(folderName);
-    
-    // Add a text file with the page content
-    let textContent = `Title: ${page.page_title}\n\n`;
-    textContent += `Mood: ${page.mood || 'Not specified'}\n\n`;
-    textContent += `Created: ${formatDate(page.created_at)}\n`;
+    const sanitizeName = (name: string) => name.replace(/[^a-zA-Z0-9\-_]/g, '_');
+    const folderName = sanitizeName(page.page_title || `page_${page.page_no}`);
+    const pageFolder = zip.folder(folderName);
+  
+    // Create text content instead of JSON metadata
+    let textContent = `Title: ${page.page_title || 'Untitled Page'}\n`;
+    textContent += `Page Number: ${page.page_no}\n`;
+    textContent += `Mood: ${page.mood || 'Not specified'}\n`;
+    textContent += `Created: ${new Date(page.created_at).toLocaleString()}\n`;
     if (page.updated_at !== page.created_at) {
-      textContent += `Updated: ${formatDate(page.updated_at)}\n`;
+      textContent += `Updated: ${new Date(page.updated_at).toLocaleString()}\n`;
     }
-    textContent += '\n\nContents:\n\n';
-    
-    contents.forEach((item, index) => {
-      textContent += `Item ${index + 1}:\n`;
-      if (item.paragraph) textContent += `${item.paragraph}\n\n`;
-      if (item.link) textContent += `Link: ${item.link}\n\n`;
-      if (item.image_url) textContent += `Image: ${item.image_url}\n\n`;
-      if (item.file_url) textContent += `File: ${item.file_url}\n\n`;
-      if (item.folder_name) textContent += `Folder: ${item.folder_name}\n\n`;
-    });
-    
-    folder?.file('page-content.txt', textContent);
-    
-    // Add images if available
-    const imageContents = contents.filter(item => item.image_url);
-    for (const item of imageContents) {
-      try {
-        const response = await fetch(item.image_url!);
-        const blob = await response.blob();
-        folder?.file(`image-${item.content_order}.${item.image_url?.split('.').pop() || 'jpg'}`, blob);
-      } catch (error) {
-        console.error('Error fetching image:', error);
+    textContent += '\n==== Contents ====\n\n';
+  
+    // Process content items
+    for (const item of contents) {
+      textContent += `[Item ${item.content_order}]\n`;
+      textContent += `Type: ${item.paragraph ? 'Text' : item.link ? 'Link' : item.image_url ? 'Image' : item.file_url ? 'File' : item.folder_name ? 'Folder' : 'Unknown'}\n`;
+  
+      if (item.paragraph) {
+        textContent += `${item.paragraph}\n\n`;
+        pageFolder?.file(`content_${item.content_order}.txt`, item.paragraph);
+      } 
+      else if (item.link) {
+        textContent += `URL: ${item.link}\n\n`;
+        pageFolder?.file(`link_${item.content_order}.url`, `[InternetShortcut]\nURL=${item.link}`);
+      }
+      else if (item.image_url || item.file_url) {
+        const fileUrl = item.image_url || item.file_url || '';
+        const filename = fileUrl.split('/').pop() || `file_${item.content_order}`;
+        
+        textContent += `Filename: ${filename}\n`;
+        
+        try {
+          const response = await fetch(fileUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          const blob = await response.blob();
+          pageFolder?.file(filename, blob);
+          textContent += `Status: Downloaded successfully\n\n`;
+        } catch (err) {
+          const error = err as Error;
+          textContent += `Status: Download failed (${error.message})\n\n`;
+        }
+      }
+      else if (item.folder_name) {
+        textContent += `Folder: ${item.folder_name}\n\n`;
       }
     }
+  
+    // Add text file instead of JSON
+    pageFolder?.file('page_contents.txt', textContent);
     
-    return await zip.generateAsync({ type: 'blob' });
+    return await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
   };
-
   const handleDownload = async () => {
     try {
+      setLoading(true);
       const content = await createZipFile();
       
-      // Create download link
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
       link.download = `${page.page_title || 'journal-page'}.zip`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       
-      // Clean up
       URL.revokeObjectURL(link.href);
+      
+      present({
+        message: 'Download started successfully',
+        duration: 3000,
+        color: 'success'
+      });
     } catch (error) {
       console.error('Error creating zip:', error);
+      present({
+        message: 'Failed to prepare download. Please try again.',
+        duration: 3000,
+        color: 'danger'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -212,18 +262,24 @@ const JournalPageView: React.FC = () => {
     try {
       setUploadingToDrive(true);
       
-      // Create the zip file
       const zipBlob = await createZipFile();
-      
       
       // Simulate upload delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      alert(`File "${page.page_title || 'journal-page'}.zip" would be uploaded to Google Drive in a real implementation.`);
+      present({
+        message: `File "${page.page_title || 'journal-page'}.zip" would be uploaded to Google Drive in a real implementation.`,
+        duration: 3000,
+        color: 'success'
+      });
       
     } catch (error) {
       console.error('Error uploading to Google Drive:', error);
-      alert('Failed to upload to Google Drive. Please try again.');
+      present({
+        message: 'Failed to upload to Google Drive. Please try again.',
+        duration: 3000,
+        color: 'danger'
+      });
     } finally {
       setUploadingToDrive(false);
     }
@@ -437,13 +493,6 @@ const JournalPageView: React.FC = () => {
       </IonContent>
 
       <IonActionSheet
-        style={{ '--width': '300px',
-          '--height': 'auto',
-          '--max-width': '90%',
-          'position': 'fixed',
-          'top': '50%',
-          'left': '50%',
-          'transform': 'translate(-50%, -50%)',}}
         isOpen={showActionSheet}
         onDidDismiss={() => setShowActionSheet(false)}
         buttons={[
