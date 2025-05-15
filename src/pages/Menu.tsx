@@ -41,7 +41,7 @@ const Menu: React.FC = () => {
   };
   const h2Style = {
     display: 'flex',
-    color: 'white',
+    color: 'black',
     margin: '3%'
   };
 

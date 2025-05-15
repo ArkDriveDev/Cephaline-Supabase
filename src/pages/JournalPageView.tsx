@@ -17,7 +17,8 @@ import {
   IonCard,
   IonCardContent,
   IonItem,
-  IonLabel
+  IonLabel,
+  IonActionSheet
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { supabase } from '../utils/supaBaseClient';
@@ -37,7 +38,9 @@ import {
   thumbsUpOutline,
   thumbsDownOutline,
   helpOutline,
-  downloadOutline
+  downloadOutline,
+  cloudUploadOutline,
+  closeOutline
 } from 'ionicons/icons';
 import './JournalPageView.css';
 
@@ -71,6 +74,8 @@ const JournalPageView: React.FC = () => {
   const [adjacentPages, setAdjacentPages] = useState<{ prev: string | null, next: string | null }>({ prev: null, next: null });
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [uploadingToDrive, setUploadingToDrive] = useState(false);
   const history = useHistory();
 
   useEffect(() => {
@@ -144,21 +149,56 @@ const JournalPageView: React.FC = () => {
     history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
+  const createZipFile = async () => {
+    const zip = new JSZip();
+    const folderName = page.page_title || 'journal-page';
+    
+    // Add all content to the zip
+    const folder = zip.folder(folderName);
+    
+    // Add a text file with the page content
+    let textContent = `Title: ${page.page_title}\n\n`;
+    textContent += `Mood: ${page.mood || 'Not specified'}\n\n`;
+    textContent += `Created: ${formatDate(page.created_at)}\n`;
+    if (page.updated_at !== page.created_at) {
+      textContent += `Updated: ${formatDate(page.updated_at)}\n`;
+    }
+    textContent += '\n\nContents:\n\n';
+    
+    contents.forEach((item, index) => {
+      textContent += `Item ${index + 1}:\n`;
+      if (item.paragraph) textContent += `${item.paragraph}\n\n`;
+      if (item.link) textContent += `Link: ${item.link}\n\n`;
+      if (item.image_url) textContent += `Image: ${item.image_url}\n\n`;
+      if (item.file_url) textContent += `File: ${item.file_url}\n\n`;
+      if (item.folder_name) textContent += `Folder: ${item.folder_name}\n\n`;
+    });
+    
+    folder?.file('page-content.txt', textContent);
+    
+    // Add images if available
+    const imageContents = contents.filter(item => item.image_url);
+    for (const item of imageContents) {
+      try {
+        const response = await fetch(item.image_url!);
+        const blob = await response.blob();
+        folder?.file(`image-${item.content_order}.${item.image_url?.split('.').pop() || 'jpg'}`, blob);
+      } catch (error) {
+        console.error('Error fetching image:', error);
+      }
+    }
+    
+    return await zip.generateAsync({ type: 'blob' });
+  };
+
   const handleDownload = async () => {
     try {
-      const zip = new JSZip();
-      const folderName = page.page_title || 'journal-page';
-      
-      // Create an empty folder in the zip
-      zip.folder(folderName);
-      
-      // Generate the zip file
-      const content = await zip.generateAsync({ type: 'blob' });
+      const content = await createZipFile();
       
       // Create download link
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      link.download = `${folderName}.zip`;
+      link.download = `${page.page_title || 'journal-page'}.zip`;
       link.click();
       
       // Clean up
@@ -167,6 +207,28 @@ const JournalPageView: React.FC = () => {
       console.error('Error creating zip:', error);
     }
   };
+
+  const handleUploadToGoogleDrive = async () => {
+    try {
+      setUploadingToDrive(true);
+      
+      // Create the zip file
+      const zipBlob = await createZipFile();
+      
+      
+      // Simulate upload delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      alert(`File "${page.page_title || 'journal-page'}.zip" would be uploaded to Google Drive in a real implementation.`);
+      
+    } catch (error) {
+      console.error('Error uploading to Google Drive:', error);
+      alert('Failed to upload to Google Drive. Please try again.');
+    } finally {
+      setUploadingToDrive(false);
+    }
+  };
+
   const navigateWithSlide = (direction: 'prev' | 'next') => {
     if (isAnimating) return;
 
@@ -302,9 +364,9 @@ const JournalPageView: React.FC = () => {
             <div className="journal-page-header">
               <div className="page-title-with-download">
                 <h1 style={{ marginRight: '12px' }}>{page.page_title}</h1>
-                <IonButton fill="clear" size="small" onClick={handleDownload}>
+                <IonButton fill="clear" size="small" onClick={() => setShowActionSheet(true)}>
                   <IonIcon icon={downloadOutline} slot="start" />
-                  Download
+                  Export
                 </IonButton>
               </div>
 
@@ -373,6 +435,41 @@ const JournalPageView: React.FC = () => {
           </div>
         </div>
       </IonContent>
+
+      <IonActionSheet
+        style={{ '--width': '300px',
+          '--height': 'auto',
+          '--max-width': '90%',
+          'position': 'fixed',
+          'top': '50%',
+          'left': '50%',
+          'transform': 'translate(-50%, -50%)',}}
+        isOpen={showActionSheet}
+        onDidDismiss={() => setShowActionSheet(false)}
+        buttons={[
+          {
+            text: 'Download to Device',
+            icon: downloadOutline,
+            handler: () => {
+              handleDownload();
+            }
+          },
+          {
+            text: 'Upload to Google Drive',
+            icon: cloudUploadOutline,
+            handler: () => {
+              handleUploadToGoogleDrive();
+            }
+          },
+          {
+            text: 'Cancel',
+            icon: closeOutline,
+            role: 'cancel'
+          }
+        ]}
+      />
+
+      <IonLoading isOpen={uploadingToDrive} message="Uploading to Google Drive..." />
     </IonPage>
   );
 };
