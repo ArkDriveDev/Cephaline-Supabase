@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import JSZip from 'jszip';
 import {
   IonPage,
   IonHeader,
@@ -36,7 +37,7 @@ import {
   thumbsUpOutline,
   thumbsDownOutline,
   helpOutline,
-  downloadOutline // ✅ added here
+  downloadOutline
 } from 'ionicons/icons';
 import './JournalPageView.css';
 
@@ -143,6 +144,29 @@ const JournalPageView: React.FC = () => {
     history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
+  const handleDownload = async () => {
+    try {
+      const zip = new JSZip();
+      const folderName = page.page_title || 'journal-page';
+      
+      // Create an empty folder in the zip
+      zip.folder(folderName);
+      
+      // Generate the zip file
+      const content = await zip.generateAsync({ type: 'blob' });
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = `${folderName}.zip`;
+      link.click();
+      
+      // Clean up
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error('Error creating zip:', error);
+    }
+  };
   const navigateWithSlide = (direction: 'prev' | 'next') => {
     if (isAnimating) return;
 
@@ -276,12 +300,11 @@ const JournalPageView: React.FC = () => {
             </IonButtons>
 
             <div className="journal-page-header">
-              {/* ✅ Title + Download button */}
-              <div className="page-title-with-download" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <h1 style={{ margin: 0 }}>{page.page_title}</h1>
-                <IonButton fill="clear" size="small" style={{ padding: 0 }}>
+              <div className="page-title-with-download">
+                <h1 style={{ marginRight: '12px' }}>{page.page_title}</h1>
+                <IonButton fill="clear" size="small" onClick={handleDownload}>
                   <IonIcon icon={downloadOutline} slot="start" />
-                  <IonText>Download</IonText>
+                  Download
                 </IonButton>
               </div>
 
@@ -296,7 +319,6 @@ const JournalPageView: React.FC = () => {
                   </IonBadge>
                 </div>
               )}
-
               <div className="page-metadata">
                 <IonText color="medium">
                   <small>Created: {formatDate(page.created_at)}</small>

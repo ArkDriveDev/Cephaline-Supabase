@@ -28,6 +28,7 @@
     "@types/react-router-dom": "^5.3.3",
     "bcryptjs": "^3.0.2",
     "ionicons": "^7.4.0",
+    "jszip": "^3.10.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-router": "^5.3.4",
