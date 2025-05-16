@@ -8,6 +8,7 @@ import { useHistory } from 'react-router-dom';
 import AvatarUpload from '../components/editprofile_components/AvatarUpload';
 import PersonalInfoForm from '../components/editprofile_components/PersonalInfoForm';
 import PasswordChangeForm from '../components/editprofile_components/PasswordChangeForm';
+import EnableMFA from '../components/MultiFactorAuth/EnableMFA';
 
 const EditProfile: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -356,6 +357,8 @@ const EditProfile: React.FC = () => {
         >
           {isUpdating ? 'Updating...' : 'Update Account'}
         </IonButton>
+
+        <EnableMFA/>
 
         <IonAlert
           isOpen={showAlert}
