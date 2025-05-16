@@ -18,7 +18,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
-import { logoGoogle } from 'ionicons/icons';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -46,36 +45,6 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
-
-  useEffect(() => {
-    const handleAuth0Session = async () => {
-      if (isAuthenticated && user) {
-        try {
-          setIsLoading(true);
-          const auth0Token = await getAccessTokenSilently();
-          
-          const { data, error } = await supabase.auth.signInWithIdToken({
-            provider: 'auth0',
-            token: auth0Token,
-          });
-
-          if (error) throw error;
-          
-          setShowToast(true);
-          setTimeout(() => {
-            navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-          }, 300);
-        } catch (error: any) {
-          setAlertMessage(error.message || 'Failed to authenticate with Supabase');
-          setShowAlert(true);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-    
-    handleAuth0Session();
-  }, [isAuthenticated, user, getAccessTokenSilently, navigation]);
 
   const doLogin = async () => {
     try {
