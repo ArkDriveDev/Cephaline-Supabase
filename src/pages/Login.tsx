@@ -12,10 +12,13 @@ import {
   IonToast,
   IonCard,
   IonCardContent,
+  IonIcon,
 } from '@ionic/react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
+import GoogleLoginButton from '../components/GoogleLoginButton';
+import { logoGoogle } from 'ionicons/icons';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -40,17 +43,17 @@ const Login: React.FC = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { isAuthenticated, user, getAccessTokenSilently, loginWithRedirect } = useAuth0();
+  const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
 
   useEffect(() => {
     const handleAuth0Session = async () => {
       if (isAuthenticated && user) {
         try {
-          // Get Auth0 token
+          setIsLoading(true);
           const auth0Token = await getAccessTokenSilently();
           
-          // Set session directly with Supabase using Auth0 token
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'auth0',
             token: auth0Token,
@@ -58,30 +61,39 @@ const Login: React.FC = () => {
 
           if (error) throw error;
           
-          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-        } catch (error) {
-          console.error('Auth0-Supabase error:', error);
-          setAlertMessage('Failed to authenticate with Supabase');
+          setShowToast(true);
+          setTimeout(() => {
+            navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+          }, 300);
+        } catch (error: any) {
+          setAlertMessage(error.message || 'Failed to authenticate with Supabase');
           setShowAlert(true);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
     
     handleAuth0Session();
   }, [isAuthenticated, user, getAccessTokenSilently, navigation]);
+
   const doLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setAlertMessage(error.message);
+      if (error) throw error;
+
+      setShowToast(true);
+      setTimeout(() => {
+        navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+      }, 300);
+    } catch (error: any) {
+      setAlertMessage(error.message || 'Login failed');
       setShowAlert(true);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    setShowToast(true);
-    setTimeout(() => {
-      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-    }, 300);
   };
 
   return (
@@ -112,6 +124,7 @@ const Login: React.FC = () => {
                 placeholder="Email"
                 value={email}
                 onIonChange={(e) => setEmail(e.detail.value!)}
+                disabled={isLoading}
               ></IonInput>
 
               <IonInput
@@ -122,6 +135,7 @@ const Login: React.FC = () => {
                 value={password}
                 onIonChange={(e) => setPassword(e.detail.value!)}
                 style={{ marginTop: '1rem' }}
+                disabled={isLoading}
               >
                 <IonInputPasswordToggle slot="end" />
               </IonInput>
@@ -131,17 +145,25 @@ const Login: React.FC = () => {
                 expand="block"
                 onClick={doLogin}
                 style={{ marginTop: '2rem', borderRadius: '8px' }}
+                disabled={isLoading}
               >
-                Login
+                {isLoading ? 'Logging in...' : 'Login'}
               </IonButton>
+
+              <div style={{ textAlign: 'center', margin: '1rem 0' }}>
+                <span style={{ color: '#666' }}>OR</span>
+              </div>
+
+              <GoogleLoginButton />
 
               <IonButton
                 fill="clear"
                 expand="block"
                 routerLink="/Cephaline-Supabase/Registration"
                 color="primary"
+                disabled={isLoading}
               >
-                Don’t have an account? Register here
+                Don't have an account? Register here
               </IonButton>
 
               <AlertBox message={alertMessage} isOpen={showAlert} onClose={() => setShowAlert(false)} />
