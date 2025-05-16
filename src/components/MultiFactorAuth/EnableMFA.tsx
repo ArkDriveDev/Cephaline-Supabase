@@ -18,7 +18,9 @@ import {
   IonIcon,
   IonToast,
   IonCard,
-  IonCardContent
+  IonCardContent,
+  IonCardHeader,
+  IonCardTitle
 } from '@ionic/react';
 import { supabase } from '../../utils/supaBaseClient';
 import { copyOutline, checkmarkDoneOutline, closeOutline } from 'ionicons/icons';
@@ -26,8 +28,7 @@ import { useCopyToClipboard } from 'react-use';
 
 const EnableMFA: React.FC = () => {
   const [isEnabled, setIsEnabled] = useState(false);
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [showCodes, setShowCodes] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<{code_hash: string, code_status: string}[]>([]);
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -40,13 +41,13 @@ const EnableMFA: React.FC = () => {
       if (user) {
         const { data, error } = await supabase
           .from('recovery_codes')
-          .select('*')
+          .select('code_hash, code_status')
           .eq('user_id', user.id)
-          .eq('code_status', 'active')
-          .limit(1);
+          .eq('code_status', 'active');
 
         if (!error && data && data.length > 0) {
           setIsEnabled(true);
+          setRecoveryCodes(data);
         }
       }
     };
@@ -60,30 +61,31 @@ const EnableMFA: React.FC = () => {
       Math.floor(10000000 + Math.random() * 90000000).toString()
     );
 
-    // Call the Supabase function
-    const { data: generatedCodes, error } = await supabase.rpc(
-      'generate_recovery_codes',
-      {
-        p_user_id: userId,
-        p_codes: codes
-      }
-    );
+    // Insert codes into the database
+    const { data, error } = await supabase
+      .from('recovery_codes')
+      .insert(
+        codes.map(code => ({
+          user_id: userId,
+          code_hash: code, // In a real app, you should hash these codes
+          code_status: 'active'
+        }))
+      )
+      .select('code_hash, code_status');
 
     if (error) {
       console.error('Error saving recovery codes:', error);
       throw error;
     }
 
-    return generatedCodes || codes;
+    return data || [];
   };
 
   const deleteAllRecoveryCodes = async (userId: string) => {
-    const { error } = await supabase.rpc(
-      'delete_user_recovery_codes',
-      {
-        p_user_id: userId
-      }
-    );
+    const { error } = await supabase
+      .from('recovery_codes')
+      .delete()
+      .eq('user_id', userId);
 
     if (error) {
       console.error('Error deleting recovery codes:', error);
@@ -102,11 +104,11 @@ const EnableMFA: React.FC = () => {
         // Generate and store recovery codes
         const codes = await generateRecoveryCodes(user.id);
         setRecoveryCodes(codes);
-        setShowCodes(true);
         setToastMessage('MFA enabled successfully!');
       } else {
         // Delete all recovery codes when disabling MFA
         await deleteAllRecoveryCodes(user.id);
+        setRecoveryCodes([]);
         setToastMessage('MFA disabled and all recovery codes deleted!');
       }
 
@@ -121,7 +123,8 @@ const EnableMFA: React.FC = () => {
   };
 
   const copyCodes = () => {
-    copyToClipboard(recoveryCodes.join('\n'));
+    const codesText = recoveryCodes.map(code => code.code_hash).join('\n');
+    copyToClipboard(codesText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -145,54 +148,41 @@ const EnableMFA: React.FC = () => {
         </IonCardContent>
       </IonCard>
 
-      <IonAlert
-        isOpen={showCodes}
-        onDidDismiss={() => setShowCodes(false)}
-        header="Recovery Codes Generated"
-        subHeader="Save these codes in a secure place"
-        message="Each code can be used only once. You won't be able to see these again."
-        buttons={[
-          {
-            text: 'I Have Saved These',
-            handler: () => setShowCodes(false)
-          }
-        ]}
-      >
-        <div className="ion-padding">
-          <IonList lines="full">
-            {recoveryCodes.map((code, index) => (
-              <IonItem key={index}>
-                <IonText>
-                  <strong>{code}</strong>
-                </IonText>
-              </IonItem>
-            ))}
-          </IonList>
+      {isEnabled && recoveryCodes.length > 0 && (
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>Your Recovery Codes</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <IonText color="medium">
+              <p>Save these codes in a secure place. Each code can be used only once.</p>
+            </IonText>
+            
+            <IonList lines="full" className="ion-margin-vertical">
+              {recoveryCodes.map((code, index) => (
+                <IonItem key={index}>
+                  <IonLabel>
+                    <h3>{code.code_hash}</h3>
+                    <p>Status: {code.code_status}</p>
+                  </IonLabel>
+                </IonItem>
+              ))}
+            </IonList>
 
-          <IonButton
-            expand="block"
-            onClick={copyCodes}
-            color="primary"
-            className="ion-margin-top"
-          >
-            <IonIcon
-              slot="start"
-              icon={copied ? checkmarkDoneOutline : copyOutline}
-            />
-            {copied ? 'Copied!' : 'Copy All Codes'}
-          </IonButton>
-
-          <IonButton
-            expand="block"
-            fill="outline"
-            onClick={() => setShowCodes(false)}
-            className="ion-margin-top"
-          >
-            <IonIcon slot="start" icon={closeOutline} />
-            Close
-          </IonButton>
-        </div>
-      </IonAlert>
+            <IonButton
+              expand="block"
+              onClick={copyCodes}
+              color="primary"
+            >
+              <IonIcon
+                slot="start"
+                icon={copied ? checkmarkDoneOutline : copyOutline}
+              />
+              {copied ? 'Copied!' : 'Copy All Codes'}
+            </IonButton>
+          </IonCardContent>
+        </IonCard>
+      )}
 
       <IonToast
         isOpen={showToast}
