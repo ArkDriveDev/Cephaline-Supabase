@@ -15,7 +15,7 @@ import {
 } from '@ionic/react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
-
+import { useAuth0 } from '@auth0/auth0-react';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -41,7 +41,34 @@ const Login: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  
+  const { isAuthenticated, user, getAccessTokenSilently, loginWithRedirect } = useAuth0();
+
+  useEffect(() => {
+    const handleAuth0Session = async () => {
+      if (isAuthenticated && user) {
+        try {
+          // Get Auth0 token
+          const auth0Token = await getAccessTokenSilently();
+          
+          // Set session directly with Supabase using Auth0 token
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'auth0',
+            token: auth0Token,
+          });
+
+          if (error) throw error;
+          
+          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+        } catch (error) {
+          console.error('Auth0-Supabase error:', error);
+          setAlertMessage('Failed to authenticate with Supabase');
+          setShowAlert(true);
+        }
+      }
+    };
+    
+    handleAuth0Session();
+  }, [isAuthenticated, user, getAccessTokenSilently, navigation]);
   const doLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
