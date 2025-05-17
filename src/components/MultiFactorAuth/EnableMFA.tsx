@@ -20,10 +20,20 @@ import {
   IonCard,
   IonCardContent,
   IonCardHeader,
-  IonCardTitle
+  IonCardTitle,
+  IonActionSheet
 } from '@ionic/react';
 import { supabase } from '../../utils/supaBaseClient';
-import { copyOutline, checkmarkDoneOutline, closeOutline } from 'ionicons/icons';
+import { 
+  copyOutline, 
+  checkmarkDoneOutline, 
+  closeOutline,
+  fingerPrintOutline,
+  eyeOutline,
+  micOutline,
+  lockClosedOutline,
+  timeOutline
+} from 'ionicons/icons';
 import { useCopyToClipboard } from 'react-use';
 
 const EnableMFA: React.FC = () => {
@@ -32,9 +42,10 @@ const EnableMFA: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [showMFASelection, setShowMFASelection] = useState(false);
+  const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
 
-  // Check if MFA is already enabled on component mount
   useEffect(() => {
     const checkMFAStatus = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -56,28 +67,22 @@ const EnableMFA: React.FC = () => {
   }, []);
 
   const generateRecoveryCodes = async (userId: string) => {
-    // Generate 5 random 8-digit codes
     const codes = Array.from({ length: 5 }, () =>
       Math.floor(10000000 + Math.random() * 90000000).toString()
     );
 
-    // Insert codes into the database
     const { data, error } = await supabase
       .from('recovery_codes')
       .insert(
         codes.map(code => ({
           user_id: userId,
-          code_hash: code, // In a real app, you should hash these codes
+          code_hash: code,
           code_status: 'active'
         }))
       )
       .select('code_hash, code_status');
 
-    if (error) {
-      console.error('Error saving recovery codes:', error);
-      throw error;
-    }
-
+    if (error) throw error;
     return data || [];
   };
 
@@ -87,39 +92,61 @@ const EnableMFA: React.FC = () => {
       .delete()
       .eq('user_id', userId);
 
-    if (error) {
-      console.error('Error deleting recovery codes:', error);
-      throw error;
-    }
+    if (error) throw error;
   };
 
   const handleToggle = async (e: CustomEvent) => {
     const enabled = e.detail.checked;
+    setPendingToggle(enabled);
 
+    if (enabled) {
+      // Show MFA selection when enabling
+      setShowMFASelection(true);
+    } else {
+      // Disable MFA immediately
+      await toggleMFA(false);
+    }
+  };
+
+  const toggleMFA = async (enable: boolean) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      if (enabled) {
-        // Generate and store recovery codes
+      if (enable) {
         const codes = await generateRecoveryCodes(user.id);
         setRecoveryCodes(codes);
         setToastMessage('MFA enabled successfully!');
+        setIsEnabled(true);
       } else {
-        // Delete all recovery codes when disabling MFA
         await deleteAllRecoveryCodes(user.id);
         setRecoveryCodes([]);
-        setToastMessage('MFA disabled and all recovery codes deleted!');
+        setToastMessage('MFA disabled successfully!');
+        setIsEnabled(false);
       }
-
-      setIsEnabled(enabled);
-      setShowToast(true);
     } catch (error: any) {
       console.error('Error toggling MFA:', error);
-      setIsEnabled(!enabled); // Revert toggle on error
       setToastMessage(error.message || 'Failed to update MFA settings');
+    } finally {
       setShowToast(true);
+      setPendingToggle(false);
     }
+  };
+
+  const handleMFASelection = (method: string) => {
+    setShowMFASelection(false);
+    
+    if (method === 'cancel') {
+      // Don't toggle if cancelled
+      setIsEnabled(false);
+      return;
+    }
+
+    // Here you would implement the specific MFA method setup
+    console.log(`Selected MFA method: ${method}`);
+    
+    // Proceed with enabling MFA
+    toggleMFA(true);
   };
 
   const copyCodes = () => {
@@ -142,6 +169,7 @@ const EnableMFA: React.FC = () => {
               <IonToggle
                 checked={isEnabled}
                 onIonChange={handleToggle}
+                disabled={pendingToggle}
               />
             </div>
           </div>
@@ -183,6 +211,40 @@ const EnableMFA: React.FC = () => {
           </IonCardContent>
         </IonCard>
       )}
+
+      <IonActionSheet
+        isOpen={showMFASelection}
+        onDidDismiss={() => handleMFASelection('cancel')}
+        header="Select MFA Method"
+        buttons={[
+          {
+            text: 'TOTP (Authenticator App)',
+            icon: timeOutline,
+            handler: () => handleMFASelection('totp')
+          },
+          {
+            text: 'Facial Recognition',
+            icon: eyeOutline,
+            handler: () => handleMFASelection('facial')
+          },
+          {
+            text: 'Vocal Password',
+            icon: micOutline,
+            handler: () => handleMFASelection('vocal')
+          },
+          {
+            text: 'Biometrics',
+            icon: fingerPrintOutline,
+            handler: () => handleMFASelection('biometrics')
+          },
+          {
+            text: 'Cancel',
+            icon: closeOutline,
+            role: 'cancel',
+            handler: () => handleMFASelection('cancel')
+          }
+        ]}
+      />
 
       <IonToast
         isOpen={showToast}
