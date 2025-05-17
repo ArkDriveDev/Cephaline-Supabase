@@ -40,6 +40,7 @@ const EnableMFA: React.FC = () => {
   const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
   const [selectedMFAMethod, setSelectedMFAMethod] = useState<string | null>(null);
+  const [showTotp, setShowTotp] = useState(false);
 
   // Check MFA status on mount
   useEffect(() => {
@@ -92,76 +93,78 @@ const EnableMFA: React.FC = () => {
 
   const handleToggle = async (e: CustomEvent) => {
     const enabled = e.detail.checked;
-    setPendingToggle(true);
-
+    
+    // Don't update state immediately - wait for user to select method or confirm
     if (enabled) {
-      // Show MFA method selection when enabling
       setShowMFASelection(true);
     } else {
-      // Show confirmation when disabling
       setShowDisableConfirm(true);
     }
   };
-
-  const confirmDisableMFA = async (confirm: boolean) => {
-    setShowDisableConfirm(false);
-
-    if (confirm) {
-      await toggleMFA(false);
-    } else {
-      // User cancelled - revert the toggle
-      setIsEnabled(true);
-    }
-    setPendingToggle(false);
-  };
-
-  const handleMFASelection = (method: string) => {
+  
+  const handleMFASelection = async (method: string) => {
     setShowMFASelection(false);
-
+  
     if (method === 'cancel') {
-      setIsEnabled(false);
+      // Don't change anything if cancelled
       setPendingToggle(false);
       return;
     }
-
+  
     setSelectedMFAMethod(method);
-
-    if (method === 'totp') {
-      // Immediately enable TOTP
-      toggleMFA(true);
-    } else {
-      // Handle other methods
-      console.log(`Selected MFA method: ${method}`);
-      toggleMFA(true);
+    setPendingToggle(true);
+  
+    try {
+      if (method === 'totp') {
+        setShowTotp(true);
+      }
+      await toggleMFA(true);
+    } finally {
+      setPendingToggle(false);
     }
   };
-
+  
   const toggleMFA = async (enable: boolean) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
-
+  
       if (enable) {
         const codes = await generateRecoveryCodes(user.id);
         setRecoveryCodes(codes);
         setToastMessage('MFA enabled successfully!');
-        setIsEnabled(true);
+        setIsEnabled(true); // Only set to true after successful enable
       } else {
         await deleteAllRecoveryCodes(user.id);
         setRecoveryCodes([]);
         setToastMessage('MFA disabled successfully!');
-        setIsEnabled(false);
+        setIsEnabled(false); // Only set to false after successful disable
+        setShowTotp(false);
+        setSelectedMFAMethod(null);
       }
     } catch (error: any) {
       console.error('Error toggling MFA:', error);
       setToastMessage(error.message || 'Failed to update MFA settings');
-      setIsEnabled(!enable); // Revert on error
+      // Don't change isEnabled state on error
+      throw error; // Re-throw to allow calling functions to handle
     } finally {
       setShowToast(true);
-      setPendingToggle(false);
     }
   };
-
+  
+  const confirmDisableMFA = async (confirm: boolean) => {
+    setShowDisableConfirm(false);
+  
+    if (confirm) {
+      setPendingToggle(true);
+      try {
+        await toggleMFA(false);
+      } finally {
+        setPendingToggle(false);
+      }
+    }
+    // If not confirmed, no state changes needed
+  };
   const copyCodes = () => {
     const codesText = recoveryCodes.map(code => code.code_hash).join('\n');
     copyToClipboard(codesText);
@@ -281,8 +284,19 @@ const EnableMFA: React.FC = () => {
       </IonCard>
     )}
 
-    {/* TOTP Toggle Component - shown when TOTP is selected */}
-    {selectedMFAMethod === 'totp' && <TotpToggle initialEnabled={true} />}
+    {/* Fixed TOTP Toggle Component */}
+    {(selectedMFAMethod === 'totp' || showTotp) && (
+      <TotpToggle 
+        initialEnabled={true}
+        onToggleChange={(enabled) => {
+          if (!enabled) {
+            // Optional: handle when TOTP is disabled from the child component
+            setShowTotp(false);
+            setSelectedMFAMethod(null);
+          }
+        }}
+      />
+    )}
   </>
 )}
       {/* MFA Method Selection Action Sheet */}
