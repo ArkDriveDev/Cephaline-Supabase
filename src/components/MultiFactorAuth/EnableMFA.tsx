@@ -27,6 +27,7 @@ import {
 } from 'ionicons/icons';
 import { useCopyToClipboard } from 'react-use';
 import { refreshOutline } from 'ionicons/icons';
+import TotpToggle from './TotpToggle';
 
 const EnableMFA: React.FC = () => {
   const [isEnabled, setIsEnabled] = useState(false);
@@ -38,6 +39,7 @@ const EnableMFA: React.FC = () => {
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
+  const [selectedMFAMethod, setSelectedMFAMethod] = useState<string | null>(null);
 
   // Check MFA status on mount
   useEffect(() => {
@@ -117,15 +119,21 @@ const EnableMFA: React.FC = () => {
     setShowMFASelection(false);
 
     if (method === 'cancel') {
-      // Don't enable if cancelled
       setIsEnabled(false);
       setPendingToggle(false);
       return;
     }
 
-    // Here you would implement the specific MFA method setup
-    console.log(`Selected MFA method: ${method}`);
-    toggleMFA(true);
+    setSelectedMFAMethod(method);
+
+    if (method === 'totp') {
+      // Immediately enable TOTP
+      toggleMFA(true);
+    } else {
+      // Handle other methods
+      console.log(`Selected MFA method: ${method}`);
+      toggleMFA(true);
+    }
   };
 
   const toggleMFA = async (enable: boolean) => {
@@ -166,20 +174,20 @@ const EnableMFA: React.FC = () => {
       setPendingToggle(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
-  
+
       // First DELETE all existing codes for this user
       const { error: deleteError } = await supabase
         .from('recovery_codes')
         .delete()
         .eq('user_id', user.id);
-  
+
       if (deleteError) throw deleteError;
-  
+
       // Generate new codes (5 new 8-digit codes)
       const newCodes = Array.from({ length: 5 }, () =>
         Math.floor(10000000 + Math.random() * 90000000).toString()
       );
-  
+
       // Insert new codes
       const { data: insertedCodes, error: insertError } = await supabase
         .from('recovery_codes')
@@ -191,9 +199,9 @@ const EnableMFA: React.FC = () => {
           }))
         )
         .select('code_hash, code_status');
-  
+
       if (insertError) throw insertError;
-  
+
       setRecoveryCodes(insertedCodes || []);
       setToastMessage('Recovery codes regenerated successfully!');
       setShowToast(true);
@@ -225,51 +233,58 @@ const EnableMFA: React.FC = () => {
         </IonCardContent>
       </IonCard>
 
-      {isEnabled && recoveryCodes.length > 0 && (
-        <IonCard>
-          <IonCardHeader>
-            <IonCardTitle>Your Recovery Codes</IonCardTitle>
-            <IonButton
-              expand="block"
-              onClick={regenerateRecoveryCodes}
-              color="warning"
-              disabled={pendingToggle}
-            >
-              <IonIcon slot="start" icon={refreshOutline} />
-              Regenerate All Codes
-            </IonButton>
-          </IonCardHeader>
-          <IonCardContent>
-            <IonText color="medium">
-              <p>Save these codes in a secure place. Each code can be used only once.</p>
-            </IonText>
+      {isEnabled && (
+  <>
+    {/* Recovery Codes Card (only shown if recovery codes exist) */}
+    {recoveryCodes.length > 0 && (
+      <IonCard>
+        <IonCardHeader>
+          <IonCardTitle>Your Recovery Codes</IonCardTitle>
+          <IonButton
+            expand="block"
+            onClick={regenerateRecoveryCodes}
+            color="warning"
+            disabled={pendingToggle}
+          >
+            <IonIcon slot="start" icon={refreshOutline} />
+            Regenerate All Codes
+          </IonButton>
+        </IonCardHeader>
+        <IonCardContent>
+          <IonText color="medium">
+            <p>Save these codes in a secure place. Each code can be used only once.</p>
+          </IonText>
 
-            <IonList lines="full" className="ion-margin-vertical">
-              {recoveryCodes.map((code, index) => (
-                <IonItem key={index}>
-                  <IonLabel>
-                    <h3>{code.code_hash}</h3>
-                    <p>Status: {code.code_status}</p>
-                  </IonLabel>
-                </IonItem>
-              ))}
-            </IonList>
+          <IonList lines="full" className="ion-margin-vertical">
+            {recoveryCodes.map((code, index) => (
+              <IonItem key={index}>
+                <IonLabel>
+                  <h3>{code.code_hash}</h3>
+                  <p>Status: {code.code_status}</p>
+                </IonLabel>
+              </IonItem>
+            ))}
+          </IonList>
 
-            <IonButton
-              expand="block"
-              onClick={copyCodes}
-              color="primary"
-            >
-              <IonIcon
-                slot="start"
-                icon={copied ? checkmarkDoneOutline : copyOutline}
-              />
-              {copied ? 'Copied!' : 'Copy All Codes'}
-            </IonButton>
-          </IonCardContent>
-        </IonCard>
-      )}
+          <IonButton
+            expand="block"
+            onClick={copyCodes}
+            color="primary"
+          >
+            <IonIcon
+              slot="start"
+              icon={copied ? checkmarkDoneOutline : copyOutline}
+            />
+            {copied ? 'Copied!' : 'Copy All Codes'}
+          </IonButton>
+        </IonCardContent>
+      </IonCard>
+    )}
 
+    {/* TOTP Toggle Component - shown when TOTP is selected */}
+    {selectedMFAMethod === 'totp' && <TotpToggle initialEnabled={true} />}
+  </>
+)}
       {/* MFA Method Selection Action Sheet */}
       <IonActionSheet
         isOpen={showMFASelection}

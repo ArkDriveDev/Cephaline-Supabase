@@ -19,7 +19,11 @@ import {
 
 import { copyOutline, refreshOutline } from 'ionicons/icons';
 
-const TotpToggle: React.FC = () => {
+interface TotpToggleProps {
+    initialEnabled?: boolean;  // Make sure this is defined
+  }
+
+  const TotpToggle: React.FC<TotpToggleProps> = ({ initialEnabled = false }) => {
   const [isEnabled, setIsEnabled] = useState(false);
 
   const handleToggle = (event: CustomEvent) => {
