@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   IonContent,
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonToggle,
   IonLabel,
-  IonAlert,
   IonList,
   IonItem,
   IonText,
@@ -21,17 +13,16 @@ import {
   IonCardContent,
   IonCardHeader,
   IonCardTitle,
-  IonActionSheet
+  IonActionSheet,
+  IonAlert
 } from '@ionic/react';
 import { supabase } from '../../utils/supaBaseClient';
 import { 
   copyOutline, 
-  checkmarkDoneOutline, 
-  closeOutline,
+  checkmarkDoneOutline,
   fingerPrintOutline,
   eyeOutline,
   micOutline,
-  lockClosedOutline,
   timeOutline
 } from 'ionicons/icons';
 import { useCopyToClipboard } from 'react-use';
@@ -43,9 +34,11 @@ const EnableMFA: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [showMFASelection, setShowMFASelection] = useState(false);
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
 
+  // Check MFA status on mount
   useEffect(() => {
     const checkMFAStatus = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -62,7 +55,6 @@ const EnableMFA: React.FC = () => {
         }
       }
     };
-
     checkMFAStatus();
   }, []);
 
@@ -97,15 +89,42 @@ const EnableMFA: React.FC = () => {
 
   const handleToggle = async (e: CustomEvent) => {
     const enabled = e.detail.checked;
-    setPendingToggle(enabled);
-
+    setPendingToggle(true);
+    
     if (enabled) {
-      // Show MFA selection when enabling
+      // Show MFA method selection when enabling
       setShowMFASelection(true);
     } else {
-      // Disable MFA immediately
-      await toggleMFA(false);
+      // Show confirmation when disabling
+      setShowDisableConfirm(true);
     }
+  };
+
+  const confirmDisableMFA = async (confirm: boolean) => {
+    setShowDisableConfirm(false);
+    
+    if (confirm) {
+      await toggleMFA(false);
+    } else {
+      // User cancelled - revert the toggle
+      setIsEnabled(true);
+    }
+    setPendingToggle(false);
+  };
+
+  const handleMFASelection = (method: string) => {
+    setShowMFASelection(false);
+    
+    if (method === 'cancel') {
+      // Don't enable if cancelled
+      setIsEnabled(false);
+      setPendingToggle(false);
+      return;
+    }
+
+    // Here you would implement the specific MFA method setup
+    console.log(`Selected MFA method: ${method}`);
+    toggleMFA(true);
   };
 
   const toggleMFA = async (enable: boolean) => {
@@ -127,26 +146,11 @@ const EnableMFA: React.FC = () => {
     } catch (error: any) {
       console.error('Error toggling MFA:', error);
       setToastMessage(error.message || 'Failed to update MFA settings');
+      setIsEnabled(!enable); // Revert on error
     } finally {
       setShowToast(true);
       setPendingToggle(false);
     }
-  };
-
-  const handleMFASelection = (method: string) => {
-    setShowMFASelection(false);
-    
-    if (method === 'cancel') {
-      // Don't toggle if cancelled
-      setIsEnabled(false);
-      return;
-    }
-
-    // Here you would implement the specific MFA method setup
-    console.log(`Selected MFA method: ${method}`);
-    
-    // Proceed with enabling MFA
-    toggleMFA(true);
   };
 
   const copyCodes = () => {
@@ -212,6 +216,7 @@ const EnableMFA: React.FC = () => {
         </IonCard>
       )}
 
+      {/* MFA Method Selection Action Sheet */}
       <IonActionSheet
         isOpen={showMFASelection}
         onDidDismiss={() => handleMFASelection('cancel')}
@@ -239,9 +244,27 @@ const EnableMFA: React.FC = () => {
           },
           {
             text: 'Cancel',
-            icon: closeOutline,
             role: 'cancel',
             handler: () => handleMFASelection('cancel')
+          }
+        ]}
+      />
+
+      {/* Disable MFA Confirmation Alert */}
+      <IonAlert
+        isOpen={showDisableConfirm}
+        onDidDismiss={() => confirmDisableMFA(false)}
+        header="Disable MFA?"
+        message="Are you sure you want to disable Multi-Factor Authentication? This will make your account less secure."
+        buttons={[
+          {
+            text: 'Cancel',
+            role: 'cancel',
+            handler: () => confirmDisableMFA(false)
+          },
+          {
+            text: 'Disable',
+            handler: () => confirmDisableMFA(true)
           }
         ]}
       />
