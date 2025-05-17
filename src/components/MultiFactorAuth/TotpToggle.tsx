@@ -3,7 +3,6 @@ import {
   IonContent,
   IonToggle,
   IonLabel,
-  IonItem,
   IonButton,
   IonCard,
   IonCardContent,
@@ -11,121 +10,124 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonToast
+  IonToast,
+  IonText
 } from '@ionic/react';
 import { copyOutline, refreshOutline } from 'ionicons/icons';
 
 interface TotpToggleProps {
   initialEnabled?: boolean;
   onToggleChange?: (enabled: boolean) => void;
+  userEmail?: string;
 }
 
 const TotpToggle: React.FC<TotpToggleProps> = ({
   initialEnabled = false,
-  onToggleChange
+  onToggleChange,
+  userEmail = 'user@example.com'
 }) => {
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
-  const [totpCode, setTotpCode] = useState('123 456');
+  const [totpSecret, setTotpSecret] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    console.log('TotpToggle mounted with enabled:', initialEnabled);
-    return () => console.log('TotpToggle unmounted');
-  }, []);
+  const generateNewSecret = (): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let result = '';
+    for (let i = 0; i < 16; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result.match(/.{1,4}/g)?.join('') || '';
+  };
+
+  const initializeTOTP = () => {
+    const secret = generateNewSecret();
+    setTotpSecret(secret);
+  };
 
   useEffect(() => {
-    setIsEnabled(initialEnabled);
-    console.log('InitialEnabled changed:', initialEnabled);
-  }, [initialEnabled]);
+    if (isEnabled && !totpSecret) {
+      initializeTOTP();
+    }
+  }, [isEnabled]);
 
   const handleToggle = (event: CustomEvent) => {
     const enabled = event.detail.checked;
-    console.log('Toggle changed to:', enabled);
     setIsEnabled(enabled);
-    onToggleChange?.(enabled);
+
+    if (enabled) {
+      initializeTOTP();
+    } else {
+      setTotpSecret('');
+    }
+
+    if (onToggleChange) {
+      onToggleChange(enabled);
+    }
   };
 
-  const regenerateCode = () => {
+  const regenerateSecret = () => {
     setIsLoading(true);
-    console.log('Regenerating TOTP code...');
-
-    setTimeout(() => {
-      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const formattedCode = newCode.match(/.{1,3}/g)?.join(' ') || newCode;
-
-      console.log('Generated new code:', formattedCode);
-      setTotpCode(formattedCode);
-      setToastMessage('New TOTP code generated!');
-      setShowToast(true);
-      setIsLoading(false);
-    }, 1000);
+    initializeTOTP();
+    setToastMessage('New TOTP secret generated!');
+    setShowToast(true);
+    setIsLoading(false);
   };
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = async (text: string) => {
     try {
-      const codeToCopy = totpCode.replace(/\s/g, '');
-      await navigator.clipboard.writeText(codeToCopy);
-      console.log('Copied to clipboard:', codeToCopy);
-      setToastMessage('Code copied to clipboard!');
+      await navigator.clipboard.writeText(text);
+      setToastMessage('Copied to clipboard!');
       setShowToast(true);
     } catch (err) {
-      console.error('Failed to copy:', err);
-      setToastMessage('Failed to copy code!');
+      setToastMessage('Failed to copy!');
       setShowToast(true);
     }
   };
 
   return (
     <IonContent className="ion-padding" scrollY={true}>
-      {/* Toggle Section */}
-      <IonItem lines="none">
-        <IonLabel>TOTP (Time-based One-Time Password)</IonLabel>
+      {/* Toggle label and switch side-by-side */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <IonLabel>
+          <strong>TOTP</strong> (Time-based One-Time Password)
+        </IonLabel>
         <IonToggle
           checked={isEnabled}
           onIonChange={handleToggle}
           disabled={isLoading}
           aria-label="Enable TOTP"
         />
-      </IonItem>
+      </div>
 
-      {isEnabled && (
-        <div style={{ marginTop: '20px' }}>
-          {/* Regenerate Button */}
-          <IonButton
-            expand="block"
-            fill="outline"
-            onClick={regenerateCode}
-            disabled={isLoading}
-          >
-            <IonIcon slot="start" icon={refreshOutline} />
-            Regenerate Code
-          </IonButton>
-
-          {/* Code Display Card */}
-          <IonCard style={{ marginTop: '16px', maxWidth: '100%' }}>
+      {isEnabled && totpSecret && (
+        <div>
+          <IonCard>
             <IonCardContent>
               <IonGrid>
                 <IonRow className="ion-align-items-center">
                   <IonCol>
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontFamily: 'monospace',
-                        letterSpacing: '3px'
-                      }}
-                    >
-                      {totpCode}
-                    </h2>
+                    <IonText>
+                      <h3 style={{ margin: 0 }}>Secret Key:</h3>
+                      <p
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '1.1rem',
+                          letterSpacing: '1px'
+                        }}
+                      >
+                        {totpSecret}
+                      </p>
+                    </IonText>
                   </IonCol>
                   <IonCol size="auto">
                     <IonButton
                       fill="clear"
-                      onClick={copyToClipboard}
-                      aria-label="Copy code"
+                      onClick={() => copyToClipboard(totpSecret)}
+                      aria-label="Copy secret"
                     >
-                      <IonIcon icon={copyOutline} size="large" />
+                      <IonIcon icon={copyOutline} />
                     </IonButton>
                   </IonCol>
                 </IonRow>
@@ -133,26 +135,42 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
             </IonCardContent>
           </IonCard>
 
-          <div
-            style={{
-              marginTop: '16px',
-              fontSize: '0.9rem',
-              color: '#666'
-            }}
+          <IonButton
+            expand="block"
+            fill="outline"
+            onClick={regenerateSecret}
+            disabled={isLoading}
+            style={{ marginTop: '16px' }}
           >
-            Scan this code in your authenticator app
-          </div>
+            <IonIcon slot="start" icon={refreshOutline} />
+            Generate New Secret Key
+          </IonButton>
+
+          <IonText
+            color="medium"
+            style={{ display: 'block', marginTop: '16px' }}
+          >
+            <p>Enter this secret key into your authenticator app:</p>
+            <p
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '1.2rem',
+                letterSpacing: '1px',
+                fontWeight: 'bold'
+              }}
+            >
+              {totpSecret}
+            </p>
+          </IonText>
         </div>
       )}
 
-      {/* Toast Notification */}
       <IonToast
         isOpen={showToast}
         onDidDismiss={() => setShowToast(false)}
         message={toastMessage}
         duration={2000}
         position="top"
-        color="primary"
       />
     </IonContent>
   );
