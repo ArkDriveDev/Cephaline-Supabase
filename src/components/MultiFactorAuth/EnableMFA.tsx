@@ -17,8 +17,8 @@ import {
   IonAlert
 } from '@ionic/react';
 import { supabase } from '../../utils/supaBaseClient';
-import { 
-  copyOutline, 
+import {
+  copyOutline,
   checkmarkDoneOutline,
   fingerPrintOutline,
   eyeOutline,
@@ -26,10 +26,11 @@ import {
   timeOutline
 } from 'ionicons/icons';
 import { useCopyToClipboard } from 'react-use';
+import { refreshOutline } from 'ionicons/icons';
 
 const EnableMFA: React.FC = () => {
   const [isEnabled, setIsEnabled] = useState(false);
-  const [recoveryCodes, setRecoveryCodes] = useState<{code_hash: string, code_status: string}[]>([]);
+  const [recoveryCodes, setRecoveryCodes] = useState<{ code_hash: string, code_status: string }[]>([]);
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -90,7 +91,7 @@ const EnableMFA: React.FC = () => {
   const handleToggle = async (e: CustomEvent) => {
     const enabled = e.detail.checked;
     setPendingToggle(true);
-    
+
     if (enabled) {
       // Show MFA method selection when enabling
       setShowMFASelection(true);
@@ -102,7 +103,7 @@ const EnableMFA: React.FC = () => {
 
   const confirmDisableMFA = async (confirm: boolean) => {
     setShowDisableConfirm(false);
-    
+
     if (confirm) {
       await toggleMFA(false);
     } else {
@@ -114,7 +115,7 @@ const EnableMFA: React.FC = () => {
 
   const handleMFASelection = (method: string) => {
     setShowMFASelection(false);
-    
+
     if (method === 'cancel') {
       // Don't enable if cancelled
       setIsEnabled(false);
@@ -160,6 +161,37 @@ const EnableMFA: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const regenerateRecoveryCodes = async () => {
+    try {
+      setPendingToggle(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+  
+      // First revoke all existing codes
+      const { error: revokeError } = await supabase
+        .from('recovery_codes')
+        .update({ 
+          code_status: 'revoked',
+          used_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .eq('code_status', 'active');
+  
+      if (revokeError) throw revokeError;
+  
+      // Generate new codes
+      const newCodes = await generateRecoveryCodes(user.id);
+      setRecoveryCodes(newCodes);
+      setToastMessage('Recovery codes regenerated successfully!');
+      setShowToast(true);
+    } catch (error: any) {
+      console.error('Error regenerating codes:', error);
+      setToastMessage(error.message || 'Failed to regenerate codes');
+      setShowToast(true);
+    } finally {
+      setPendingToggle(false);
+    }
+  };
   return (
     <IonContent className="ion-padding">
       <IonCard>
@@ -184,12 +216,21 @@ const EnableMFA: React.FC = () => {
         <IonCard>
           <IonCardHeader>
             <IonCardTitle>Your Recovery Codes</IonCardTitle>
+            <IonButton
+              expand="block"
+              onClick={regenerateRecoveryCodes}
+              color="warning"
+              disabled={pendingToggle}
+            >
+              <IonIcon slot="start" icon={refreshOutline} />
+              Regenerate All Codes
+            </IonButton>
           </IonCardHeader>
           <IonCardContent>
             <IonText color="medium">
               <p>Save these codes in a secure place. Each code can be used only once.</p>
             </IonText>
-            
+
             <IonList lines="full" className="ion-margin-vertical">
               {recoveryCodes.map((code, index) => (
                 <IonItem key={index}>
