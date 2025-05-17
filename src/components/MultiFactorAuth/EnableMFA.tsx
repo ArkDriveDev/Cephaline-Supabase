@@ -167,21 +167,34 @@ const EnableMFA: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
   
-      // First revoke all existing codes
-      const { error: revokeError } = await supabase
+      // First DELETE all existing codes for this user
+      const { error: deleteError } = await supabase
         .from('recovery_codes')
-        .update({ 
-          code_status: 'revoked',
-          used_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id)
-        .eq('code_status', 'active');
+        .delete()
+        .eq('user_id', user.id);
   
-      if (revokeError) throw revokeError;
+      if (deleteError) throw deleteError;
   
-      // Generate new codes
-      const newCodes = await generateRecoveryCodes(user.id);
-      setRecoveryCodes(newCodes);
+      // Generate new codes (5 new 8-digit codes)
+      const newCodes = Array.from({ length: 5 }, () =>
+        Math.floor(10000000 + Math.random() * 90000000).toString()
+      );
+  
+      // Insert new codes
+      const { data: insertedCodes, error: insertError } = await supabase
+        .from('recovery_codes')
+        .insert(
+          newCodes.map(code => ({
+            user_id: user.id,
+            code_hash: code,
+            code_status: 'active'
+          }))
+        )
+        .select('code_hash, code_status');
+  
+      if (insertError) throw insertError;
+  
+      setRecoveryCodes(insertedCodes || []);
       setToastMessage('Recovery codes regenerated successfully!');
       setShowToast(true);
     } catch (error: any) {
