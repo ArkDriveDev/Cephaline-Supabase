@@ -20,9 +20,9 @@ interface TotpToggleProps {
   onToggleChange?: (enabled: boolean) => void;
 }
 
-const TotpToggle: React.FC<TotpToggleProps> = ({ 
-  initialEnabled = false, 
-  onToggleChange 
+const TotpToggle: React.FC<TotpToggleProps> = ({
+  initialEnabled = false,
+  onToggleChange
 }) => {
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
   const [totpCode, setTotpCode] = useState('123 456');
@@ -30,7 +30,6 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Debugging
   useEffect(() => {
     console.log('TotpToggle mounted with enabled:', initialEnabled);
     return () => console.log('TotpToggle unmounted');
@@ -51,11 +50,11 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
   const regenerateCode = () => {
     setIsLoading(true);
     console.log('Regenerating TOTP code...');
-    
+
     setTimeout(() => {
       const newCode = Math.floor(100000 + Math.random() * 900000).toString();
       const formattedCode = newCode.match(/.{1,3}/g)?.join(' ') || newCode;
-      
+
       console.log('Generated new code:', formattedCode);
       setTotpCode(formattedCode);
       setToastMessage('New TOTP code generated!');
@@ -80,88 +79,81 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
 
   return (
     <IonContent className="ion-padding" scrollY={true}>
-      <div style={{
-        maxWidth: '600px',
-        margin: '0 auto',
-        border: '1px solid #ddd', // Debug border
-        borderRadius: '8px',
-        padding: '16px'
-      }}>
-        {/* Toggle Section */}
-        <IonItem lines="none">
-          <IonLabel>TOTP (Time-based One-Time Password)</IonLabel>
-          <IonToggle
-            checked={isEnabled}
-            onIonChange={handleToggle}
+      {/* Toggle Section */}
+      <IonItem lines="none">
+        <IonLabel>TOTP (Time-based One-Time Password)</IonLabel>
+        <IonToggle
+          checked={isEnabled}
+          onIonChange={handleToggle}
+          disabled={isLoading}
+          aria-label="Enable TOTP"
+        />
+      </IonItem>
+
+      {isEnabled && (
+        <div style={{ marginTop: '20px' }}>
+          {/* Regenerate Button */}
+          <IonButton
+            expand="block"
+            fill="outline"
+            onClick={regenerateCode}
             disabled={isLoading}
-            aria-label="Enable TOTP"
-          />
-        </IonItem>
+          >
+            <IonIcon slot="start" icon={refreshOutline} />
+            Regenerate Code
+          </IonButton>
 
-        {isEnabled && (
-          <div style={{ marginTop: '20px' }}>
-            {/* Regenerate Button */}
-            <IonButton 
-              expand="block" 
-              fill="outline"
-              onClick={regenerateCode}
-              disabled={isLoading}
-            >
-              <IonIcon slot="start" icon={refreshOutline} />
-              Regenerate Code
-            </IonButton>
-
-            {/* Code Display Card */}
-            <IonCard style={{ marginTop: '16px' }}>
-              <IonCardContent>
-                <IonGrid>
-                  <IonRow className="ion-align-items-center">
-                    <IonCol>
-                      <h2 style={{ 
+          {/* Code Display Card */}
+          <IonCard style={{ marginTop: '16px', maxWidth: '100%' }}>
+            <IonCardContent>
+              <IonGrid>
+                <IonRow className="ion-align-items-center">
+                  <IonCol>
+                    <h2
+                      style={{
                         margin: 0,
                         fontFamily: 'monospace',
                         letterSpacing: '3px'
-                      }}>
-                        {totpCode}
-                      </h2>
-                    </IonCol>
-                    <IonCol size="auto">
-                      <IonButton 
-                        fill="clear"
-                        onClick={copyToClipboard}
-                        aria-label="Copy code"
-                      >
-                        <IonIcon 
-                          icon={copyOutline} 
-                          size="large"
-                        />
-                      </IonButton>
-                    </IonCol>
-                  </IonRow>
-                </IonGrid>
-              </IonCardContent>
-            </IonCard>
+                      }}
+                    >
+                      {totpCode}
+                    </h2>
+                  </IonCol>
+                  <IonCol size="auto">
+                    <IonButton
+                      fill="clear"
+                      onClick={copyToClipboard}
+                      aria-label="Copy code"
+                    >
+                      <IonIcon icon={copyOutline} size="large" />
+                    </IonButton>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </IonCardContent>
+          </IonCard>
 
-            <div style={{ 
+          <div
+            style={{
               marginTop: '16px',
               fontSize: '0.9rem',
-              color: '#666',
-              textAlign: 'center'
-            }}>
-              Scan this code in your authenticator app
-            </div>
+              color: '#666'
+            }}
+          >
+            Scan this code in your authenticator app
           </div>
-        )}
+        </div>
+      )}
 
-        <IonToast
-          isOpen={showToast}
-          onDidDismiss={() => setShowToast(false)}
-          message={toastMessage}
-          duration={2000}
-          position="top"
-          color="primary"
-        />
-      </div>
+      {/* Toast Notification */}
+      <IonToast
+        isOpen={showToast}
+        onDidDismiss={() => setShowToast(false)}
+        message={toastMessage}
+        duration={2000}
+        position="top"
+        color="primary"
+      />
     </IonContent>
   );
 };
