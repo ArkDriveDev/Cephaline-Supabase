@@ -7,8 +7,17 @@ import {
   IonToolbar,
   IonToggle,
   IonLabel,
-  IonItem
+  IonItem,
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonIcon,
+  IonGrid,
+  IonRow,
+  IonCol
 } from '@ionic/react';
+
+import { copyOutline, refreshOutline } from 'ionicons/icons';
 
 const TotpToggle: React.FC = () => {
   const [isEnabled, setIsEnabled] = useState(false);
@@ -19,6 +28,8 @@ const TotpToggle: React.FC = () => {
 
   return (
       <IonContent className="ion-padding">
+
+        {/* Toggle Switch */}
         <IonItem>
           <IonLabel>
             TOTP (Time-based One-Time Password)
@@ -28,7 +39,29 @@ const TotpToggle: React.FC = () => {
             onIonChange={handleToggle}
           />
         </IonItem>
-        <p>Status: <strong>{isEnabled ? 'Enabled' : 'Disabled'}</strong></p>
+
+        {/* Regenerate Button */}
+        <IonButton expand="block" fill="outline" className="ion-margin-top">
+          <IonIcon slot="start" icon={refreshOutline} />
+          Regenerate
+        </IonButton>
+
+        {/* TOTP Code Card */}
+        <IonCard className="ion-margin-top">
+          <IonCardContent>
+            <IonGrid>
+              <IonRow className="ion-align-items-center">
+                <IonCol>
+                  <h2 style={{ margin: 0 }}>123 456</h2>
+                </IonCol>
+                <IonCol size="auto">
+                  <IonIcon icon={copyOutline} style={{ fontSize: '24px', cursor: 'pointer' }} />
+                </IonCol>
+              </IonRow>
+            </IonGrid>
+          </IonCardContent>
+        </IonCard>
+
       </IonContent>
   );
 };
