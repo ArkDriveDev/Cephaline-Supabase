@@ -89,30 +89,37 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
     try {
       if (enable) {
         const secret = generateNewSecret();
-        await supabase
+        
+        // Delete all existing TOTP codes for this user (both used and unused)
+        const { error: deleteError } = await supabase
           .from('totp_codes')
           .delete()
           .eq('user_id', userId);
-
-        const { error } = await supabase
+  
+        if (deleteError) throw deleteError;
+  
+        // Insert new TOTP code
+        const { error: insertError } = await supabase
           .from('totp_codes')
           .insert({
             user_id: userId,
             code_hash: secret.replace(/\s/g, ''),
             created_at: new Date().toISOString()
           });
-
-        if (error) throw error;
+  
+        if (insertError) throw insertError;
+  
         setTotpSecret(secret);
         return true;
       } else {
-        const { error } = await supabase
+        // Delete all TOTP codes for this user (simpler approach)
+        const { error: deleteError } = await supabase
           .from('totp_codes')
-          .update({ used_at: new Date().toISOString() })
-          .eq('user_id', userId)
-          .is('used_at', null);
-
-        if (error) throw error;
+          .delete()
+          .eq('user_id', userId);
+  
+        if (deleteError) throw deleteError;
+  
         setTotpSecret('');
         return true;
       }
