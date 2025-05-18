@@ -46,10 +46,10 @@ const EnableMFA: React.FC = () => {
   const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
   const [selectedMFAMethod, setSelectedMFAMethod] = useState<string | null>(null);
-  const [showTotp, setShowTotp] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
+  // Check MFA status on load
   useEffect(() => {
     const checkMFAStatus = async () => {
       try {
@@ -58,16 +58,27 @@ const EnableMFA: React.FC = () => {
 
         if (user) {
           setUser(user);
-          const { data, error: codesError } = await supabase
+          
+          // Check recovery codes
+          const { data: codesData, error: codesError } = await supabase
             .from('recovery_codes')
             .select('code_hash, code_status')
             .eq('user_id', user.id)
             .eq('code_status', 'active');
 
-          if (!codesError && data && data.length > 0) {
-            setIsEnabled(true);
-            setRecoveryCodes(data);
-          }
+          // Check TOTP status
+          const { data: totpData, error: totpError } = await supabase
+            .from('totp_codes')
+            .select('code_hash')
+            .eq('user_id', user.id)
+            .is('used_at', null)
+            .limit(1);
+
+          const hasMFA = (codesData?.length ?? 0) > 0 || (totpData?.length ?? 0) > 0;
+          
+          setIsEnabled(hasMFA);
+          if (codesData) setRecoveryCodes(codesData);
+          if (totpData?.length) setSelectedMFAMethod('totp');
         }
       } catch (error) {
         console.error('Error checking MFA status:', error);
@@ -80,6 +91,7 @@ const EnableMFA: React.FC = () => {
     checkMFAStatus();
   }, []);
 
+  // Generate recovery codes
   const generateRecoveryCodes = async (userId: string) => {
     const codes = Array.from({ length: 5 }, () =>
       Math.floor(10000000 + Math.random() * 90000000).toString()
@@ -100,6 +112,7 @@ const EnableMFA: React.FC = () => {
     return data || [];
   };
 
+  // Delete all recovery codes
   const deleteAllRecoveryCodes = async (userId: string) => {
     const { error } = await supabase
       .from('recovery_codes')
@@ -109,9 +122,9 @@ const EnableMFA: React.FC = () => {
     if (error) throw error;
   };
 
+  // Handle main toggle
   const handleToggle = async (e: CustomEvent) => {
     const enabled = e.detail.checked;
-
     if (enabled) {
       setShowMFASelection(true);
     } else {
@@ -119,67 +132,53 @@ const EnableMFA: React.FC = () => {
     }
   };
 
+  // Handle MFA method selection
   const handleMFASelection = async (method: string) => {
     setShowMFASelection(false);
+    if (method === 'cancel') return;
 
-    if (method === 'cancel') {
-      return;
-    }
-
-    setSelectedMFAMethod(method);
     setPendingToggle(true);
-
     try {
       if (method === 'totp') {
-        setShowTotp(true);
+        setSelectedMFAMethod('totp');
       }
-      await toggleMFA(true);
-    } catch (error) {
+      const codes = await generateRecoveryCodes(user?.id || '');
+      setRecoveryCodes(codes);
+      setIsEnabled(true);
+      setToastMessage('MFA enabled successfully!');
+      setShowToast(true);
+    } catch (error: any) {
       console.error('Error enabling MFA:', error);
+      setToastMessage(error.message || 'Failed to enable MFA');
+      setShowToast(true);
     } finally {
       setPendingToggle(false);
     }
   };
 
-  const toggleMFA = async (enable: boolean) => {
-    if (!user) return;
-
-    try {
-      if (enable) {
-        const codes = await generateRecoveryCodes(user.id);
-        setRecoveryCodes(codes);
-        setToastMessage('MFA enabled successfully!');
-        setIsEnabled(true);
-      } else {
-        await deleteAllRecoveryCodes(user.id);
-        setRecoveryCodes([]);
-        setToastMessage('MFA disabled successfully!');
-        setIsEnabled(false);
-        setShowTotp(false);
-        setSelectedMFAMethod(null);
-      }
-    } catch (error: any) {
-      console.error('Error toggling MFA:', error);
-      setToastMessage(error.message || 'Failed to update MFA settings');
-      throw error;
-    } finally {
-      setShowToast(true);
-    }
-  };
-
+  // Disable MFA
   const confirmDisableMFA = async (confirm: boolean) => {
     setShowDisableConfirm(false);
+    if (!confirm) return;
 
-    if (confirm) {
-      setPendingToggle(true);
-      try {
-        await toggleMFA(false);
-      } finally {
-        setPendingToggle(false);
-      }
+    setPendingToggle(true);
+    try {
+      await deleteAllRecoveryCodes(user?.id || '');
+      setRecoveryCodes([]);
+      setIsEnabled(false);
+      setSelectedMFAMethod(null);
+      setToastMessage('MFA disabled successfully!');
+      setShowToast(true);
+    } catch (error: any) {
+      console.error('Error disabling MFA:', error);
+      setToastMessage(error.message || 'Failed to disable MFA');
+      setShowToast(true);
+    } finally {
+      setPendingToggle(false);
     }
   };
 
+  // Copy recovery codes
   const copyCodes = () => {
     const codesText = recoveryCodes.map(code => code.code_hash).join('\n');
     copyToClipboard(codesText);
@@ -187,46 +186,23 @@ const EnableMFA: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Regenerate recovery codes
   const regenerateRecoveryCodes = async () => {
     if (!user) return;
 
+    setPendingToggle(true);
     try {
-      setPendingToggle(true);
-      // Delete all existing codes
-      const { error: deleteError } = await supabase
-        .from('recovery_codes')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (deleteError) throw deleteError;
-
-      // Generate new codes
-      const newCodes = Array.from({ length: 5 }, () =>
-        Math.floor(10000000 + Math.random() * 90000000).toString()
-      );
-
-      // Insert new codes
-      const { data: insertedCodes, error: insertError } = await supabase
-        .from('recovery_codes')
-        .insert(
-          newCodes.map(code => ({
-            user_id: user.id,
-            code_hash: code,
-            code_status: 'active'
-          }))
-        )
-        .select('code_hash, code_status');
-
-      if (insertError) throw insertError;
-
-      setRecoveryCodes(insertedCodes || []);
-      setToastMessage('Recovery codes regenerated successfully!');
+      await deleteAllRecoveryCodes(user.id);
+      const newCodes = await generateRecoveryCodes(user.id);
+      setRecoveryCodes(newCodes);
+      setToastMessage('Recovery codes regenerated!');
+      setShowToast(true);
     } catch (error: any) {
       console.error('Error regenerating codes:', error);
       setToastMessage(error.message || 'Failed to regenerate codes');
+      setShowToast(true);
     } finally {
       setPendingToggle(false);
-      setShowToast(true);
     }
   };
 
@@ -244,7 +220,7 @@ const EnableMFA: React.FC = () => {
         <IonCardContent>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
             <div style={{ flexGrow: 1 }}>
-              <h2 style={{ margin: 0 }}>Enable Multi-Factor Authentication</h2>
+              <h2 style={{ margin: 0 }}>Multi-Factor Authentication</h2>
               <p style={{ margin: 0, fontSize: '0.9em', color: '#666' }}>
                 Add an extra layer of security to your account
               </p>
@@ -305,14 +281,16 @@ const EnableMFA: React.FC = () => {
             </IonCard>
           )}
 
-          <TotpToggle
-            initialEnabled={selectedMFAMethod === 'totp' || showTotp}
-            userId={user?.id || ''}
-            onToggleChange={(enabled) => {
-              setShowTotp(enabled);
-              setSelectedMFAMethod(enabled ? 'totp' : null);
-            }}
-          />
+          {selectedMFAMethod === 'totp' && (
+            <TotpToggle
+              userId={user?.id || ''}
+              onToggleChange={(enabled) => {
+                if (!enabled) {
+                  setSelectedMFAMethod(null);
+                }
+              }}
+            />
+          )}
         </>
       )}
 
@@ -322,24 +300,9 @@ const EnableMFA: React.FC = () => {
         header="Select MFA Method"
         buttons={[
           {
-            text: 'TOTP (Authenticator App)',
+            text: 'Authenticator App (TOTP)',
             icon: timeOutline,
             handler: () => handleMFASelection('totp')
-          },
-          {
-            text: 'Facial Recognition',
-            icon: eyeOutline,
-            handler: () => handleMFASelection('facial')
-          },
-          {
-            text: 'Vocal Password',
-            icon: micOutline,
-            handler: () => handleMFASelection('vocal')
-          },
-          {
-            text: 'Biometrics',
-            icon: fingerPrintOutline,
-            handler: () => handleMFASelection('biometrics')
           },
           {
             text: 'Cancel',
@@ -373,7 +336,6 @@ const EnableMFA: React.FC = () => {
         message={toastMessage}
         duration={3000}
         position="top"
-        color={toastMessage.includes('success') ? 'success' : 'danger'}
       />
     </IonContent>
   );

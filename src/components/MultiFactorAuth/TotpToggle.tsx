@@ -18,24 +18,18 @@ import { copyOutline } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
 
 interface TotpToggleProps {
-  initialEnabled: boolean;
-  onToggleChange?: (enabled: boolean) => void;
   userId: string;
+  onToggleChange?: (enabled: boolean) => void;
 }
 
-const TotpToggle: React.FC<TotpToggleProps> = ({
-  initialEnabled,
-  onToggleChange,
-  userId
-}) => {
-  const [isEnabled, setIsEnabled] = useState(initialEnabled);
+const TotpToggle: React.FC<TotpToggleProps> = ({ userId, onToggleChange }) => {
+  const [isEnabled, setIsEnabled] = useState(false);
   const [totpSecret, setTotpSecret] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
 
-  // More reliable secret generation
+  // Generate TOTP secret
   const generateNewSecret = useCallback((): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     const randomValues = new Uint32Array(16);
@@ -47,128 +41,103 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
     return result.match(/.{4}/g)?.join(' ') || '';
   }, []);
 
-  const deleteUnusedTotpCodes = useCallback(async (): Promise<void> => {
-    try {
-      const { error } = await supabase
-        .from('totp_codes')
-        .delete()
-        .eq('user_id', userId);
-      
-      if (error) throw error;
-    } catch (error: any) {
-      console.error('Delete error:', error);
-      throw new Error('Failed to remove old codes');
-    }
-  }, [userId]);
-
-  const storeSecretInDatabase = useCallback(async (secret: string): Promise<void> => {
-    try {
-      await deleteUnusedTotpCodes();
-      
-      const { error } = await supabase
-        .from('totp_codes')
-        .insert({
-          user_id: userId,
-          code_hash: secret.replace(/\s/g, ''), // Store without spaces
-          created_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-    } catch (error: any) {
-      console.error('Store error:', error);
-      throw new Error('Failed to setup TOTP');
-    }
-  }, [userId, deleteUnusedTotpCodes]);
-
-  const checkExistingSecret = useCallback(async (): Promise<boolean> => {
+  // Check if TOTP is already enabled
+  const checkTotpStatus = useCallback(async (): Promise<{enabled: boolean, secret?: string}> => {
     try {
       const { data, error } = await supabase
         .from('totp_codes')
         .select('code_hash')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .is('used_at', null)
         .limit(1);
 
       if (error) throw error;
-      
-      if (data?.[0]?.code_hash) {
-        setTotpSecret(data[0].code_hash.match(/.{4}/g)?.join(' ') || data[0].code_hash);
-        return true;
-      }
-      return false;
+      return {
+        enabled: !!data?.length,
+        secret: data?.[0]?.code_hash
+      };
     } catch (error) {
-      console.error('Check error:', error);
-      return false;
+      console.error('Error checking TOTP status:', error);
+      return { enabled: false };
     }
   }, [userId]);
 
-  const initializeTOTP = useCallback(async (): Promise<void> => {
-    setIsGenerating(true);
-    try {
-      const secret = generateNewSecret();
-      await storeSecretInDatabase(secret);
-      setTotpSecret(secret);
-      setToastMessage('TOTP setup complete!');
-      setShowToast(true);
-    } catch (error: any) {
-      setToastMessage(error.message);
-      setShowToast(true);
-      throw error;
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [generateNewSecret, storeSecretInDatabase]);
+  // Initialize component
+  useEffect(() => {
+    const initialize = async () => {
+      if (userId) {
+        setIsLoading(true);
+        try {
+          const { enabled, secret } = await checkTotpStatus();
+          setIsEnabled(enabled);
+          if (enabled && secret) {
+            setTotpSecret(secret.match(/.{4}/g)?.join(' ') || secret);
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    initialize();
+  }, [userId, checkTotpStatus]);
 
-  const disableTOTP = useCallback(async (): Promise<void> => {
+  // Store or remove TOTP secret
+  const updateTotpStatus = useCallback(async (enable: boolean): Promise<boolean> => {
     setIsLoading(true);
     try {
-      await deleteUnusedTotpCodes();
-      setTotpSecret('');
-      setToastMessage('TOTP disabled');
-      setShowToast(true);
+      if (enable) {
+        const secret = generateNewSecret();
+        // Delete any existing codes
+        await supabase
+          .from('totp_codes')
+          .delete()
+          .eq('user_id', userId);
+        
+        // Insert new code
+        const { error } = await supabase
+          .from('totp_codes')
+          .insert({
+            user_id: userId,
+            code_hash: secret.replace(/\s/g, ''),
+            created_at: new Date().toISOString()
+          });
+
+        if (error) throw error;
+        setTotpSecret(secret);
+        return true;
+      } else {
+        // Disable by marking all codes as used
+        const { error } = await supabase
+          .from('totp_codes')
+          .update({ used_at: new Date().toISOString() })
+          .eq('user_id', userId)
+          .is('used_at', null);
+
+        if (error) throw error;
+        setTotpSecret('');
+        return true;
+      }
     } catch (error: any) {
-      setToastMessage(error.message);
+      console.error('Error updating TOTP:', error);
+      setToastMessage(error.message || 'Failed to update TOTP');
       setShowToast(true);
-      throw error;
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [deleteUnusedTotpCodes]);
-
-  useEffect(() => {
-    if (initialEnabled && userId && !totpSecret) {
-      const checkSecret = async () => {
-        try {
-          const hasSecret = await checkExistingSecret();
-          if (!hasSecret) {
-            await initializeTOTP();
-          }
-        } catch (error) {
-          console.error('Initialization error:', error);
-        }
-      };
-      checkSecret();
-    }
-  }, [initialEnabled, userId, totpSecret, checkExistingSecret, initializeTOTP]);
+  }, [userId, generateNewSecret]);
 
   const handleToggle = async (event: CustomEvent) => {
     const enabled = event.detail.checked;
-    if (isLoading || isGenerating) return;
-    
-    setIsLoading(true);
-    try {
-      if (enabled) {
-        await initializeTOTP();
-      } else {
-        await disableTOTP();
-      }
+    if (isLoading) return;
+
+    const success = await updateTotpStatus(enabled);
+    if (success) {
       setIsEnabled(enabled);
       onToggleChange?.(enabled);
-    } catch (error) {
-      console.error('Toggle error:', error);
-      setIsEnabled(!enabled); // Revert on error
-    } finally {
-      setIsLoading(false);
+    } else {
+      // Revert toggle if operation failed
+      setIsEnabled(!enabled);
     }
   };
 
@@ -188,15 +157,15 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
     <IonContent className="ion-padding">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <IonLabel>
-          <strong>TOTP Authentication</strong>
+          <strong>Authenticator App (TOTP)</strong>
         </IonLabel>
-        {(isLoading || isGenerating) ? (
+        {isLoading ? (
           <IonSpinner name="crescent" />
         ) : (
           <IonToggle
             checked={isEnabled}
             onIonChange={handleToggle}
-            disabled={isLoading || isGenerating}
+            disabled={isLoading}
           />
         )}
       </div>
@@ -217,14 +186,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
                         wordBreak: 'break-all',
                         margin: '8px 0'
                       }}>
-                        {isGenerating ? (
-                          <>
-                            <IonSpinner name="dots" style={{ marginRight: '8px' }} />
-                            Generating...
-                          </>
-                        ) : (
-                          totpSecret
-                        )}
+                        {totpSecret || 'Loading...'}
                       </p>
                     </IonText>
                   </IonCol>
@@ -232,7 +194,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
                     <IonButton
                       fill="clear"
                       onClick={copyToClipboard}
-                      disabled={!totpSecret || isGenerating}
+                      disabled={!totpSecret}
                     >
                       <IonIcon icon={copyOutline} />
                     </IonButton>
