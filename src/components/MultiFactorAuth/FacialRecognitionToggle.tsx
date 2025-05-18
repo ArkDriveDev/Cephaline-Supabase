@@ -62,54 +62,44 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     };
   }, []);
 
-  const checkExistingPhoto = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+   const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
 
-      const { data } = await supabase
-        .storage
-        .from('facial-recognition')
-        .createSignedUrl(`${user.id}/profile.jpg`, 3600);
-
-      if (data?.signedUrl) {
-        setPhoto(data.signedUrl);
-        setEnabled(true);
+    setCaptureStatus('Capturing photo...');
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    if (!context) return;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(async (blob) => {
+      if (blob) {
+        await uploadPhoto(blob);
       }
-    } catch (error) {
-      console.log('No existing photo found');
-    }
+      
+      // Stop camera stream
+      if (video.srcObject) {
+        (video.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      }
+      
+      setShowCameraModal(false);
+    }, 'image/jpeg', 0.9);
   };
 
-  const startCamera = async () => {
-    try {
-      setShowCameraModal(true);
-      setCaptureStatus('Preparing camera...');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user' // Front camera
-        }
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      
-      setCaptureStatus('Position your face in the frame...');
-      
-      // Start checking for stable image
-      startStabilityCheck();
-    } catch (error) {
-      console.error('Camera error:', error);
-      setToastMessage('Please enable camera permissions');
-      setShowToast(true);
-      setEnabled(false);
-      setShowCameraModal(false);
+  const compareImageData = (img1: ImageData, img2: ImageData): number => {
+    // Simple image difference calculation
+    let diff = 0;
+    for (let i = 0; i < img1.data.length; i += 4) {
+      diff += Math.abs(img1.data[i] - img2.data[i]) + 
+              Math.abs(img1.data[i+1] - img2.data[i+1]) + 
+              Math.abs(img1.data[i+2] - img2.data[i+2]);
     }
+    return diff / (img1.width * img1.height * 3);
   };
 
   const startStabilityCheck = () => {
@@ -155,80 +145,146 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     }, 500);
   };
 
-  const compareImageData = (img1: ImageData, img2: ImageData): number => {
-    // Simple image difference calculation
-    let diff = 0;
-    for (let i = 0; i < img1.data.length; i += 4) {
-      diff += Math.abs(img1.data[i] - img2.data[i]) + 
-              Math.abs(img1.data[i+1] - img2.data[i+1]) + 
-              Math.abs(img1.data[i+2] - img2.data[i+2]);
-    }
-    return diff / (img1.width * img1.height * 3);
-  };
-
-  const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    setCaptureStatus('Capturing photo...');
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    
-    if (!context) return;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        await uploadPhoto(blob);
+   const startCamera = async () => {
+    try {
+      setShowCameraModal(true);
+      setCaptureStatus('Preparing camera...');
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user' // Front camera
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
       }
       
-      // Stop camera stream
-      if (video.srcObject) {
-        (video.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-      }
+      setCaptureStatus('Position your face in the frame...');
       
+      // Start checking for stable image
+      startStabilityCheck();
+    } catch (error) {
+      console.error('Camera error:', error);
+      setToastMessage('Please enable camera permissions');
+      setShowToast(true);
+      setEnabled(false);
       setShowCameraModal(false);
-    }, 'image/jpeg', 0.9);
+    }
   };
 
-  const uploadPhoto = async (blob: Blob) => {
-    setUploading(true);
+ // Update these functions in your component:
+
+const checkExistingPhoto = async () => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return;
+
+    // 1. Check database record first
+    const { data: enrollment, error: dbError } = await supabase
+      .from('user_facial_enrollments')
+      .select('storage_path')
+      .eq('user_id', user.id)
+      .single();
+
+    if (dbError || !enrollment) return;
+
+    // 2. Get signed URL for private bucket - updated response handling
+    const { data: signedUrlData, error: urlError } = await supabase.storage
+      .from('facial-recognition')
+      .createSignedUrl(enrollment.storage_path, 3600); // 1 hour expiry
+
+    if (urlError || !signedUrlData) {
+      throw urlError || new Error('Failed to generate signed URL');
+    }
+
+    setPhoto(signedUrlData.signedUrl);
+    setEnabled(true);
+  } catch (error) {
+    console.error('Photo check error:', error);
+    setToastMessage('Failed to load existing face data');
+    setShowToast(true);
+  }
+};
+
+const uploadPhoto = async (blob: Blob) => {
+  setUploading(true);
+  try {
+    // 1. Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
+
+    // 2. Prepare file metadata
+    const fileName = `profile_${Date.now()}.jpg`;
+    const filePath = `${user.id}/${fileName}`;
+    const fileExt = fileName.split('.').pop();
+
+    // 3. Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('facial-recognition')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
+      });
+
+    if (uploadError) throw uploadError;
+
+    // 4. Store reference in database
+    const { error: dbError } = await supabase
+      .from('user_facial_enrollments')
+      .upsert({
+        user_id: user.id,
+        storage_path: filePath
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (dbError) throw dbError;
+
+    // 5. Get signed URL - updated response handling
+    const { data: signedUrlData, error: urlError } = await supabase.storage
+      .from('facial-recognition')
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+    if (urlError || !signedUrlData) {
+      throw urlError || new Error('Failed to generate signed URL');
+    }
+
+    setPhoto(signedUrlData.signedUrl);
+    setToastMessage('Face registration successful!');
+    setShowToast(true);
+    return true;
+  } catch (error) {
+    console.error('Upload error:', error);
+    setToastMessage(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    setShowToast(true);
+    setEnabled(false);
+    
+    // Clean up if partially completed
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase.storage
-        .from('facial-recognition')
-        .upload(`${user.id}/profile.jpg`, blob, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: 'image/jpeg'
-        });
-
-      if (error) throw error;
-
-      // Get the uploaded photo URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('facial-recognition')
-        .getPublicUrl(`${user.id}/profile.jpg`);
-
-      setPhoto(publicUrl);
-      setToastMessage('Face photo saved successfully!');
-      setShowToast(true);
-    } catch (error) {
-      setToastMessage('Failed to upload photo');
-      setShowToast(true);
-      console.error(error);
-      setEnabled(false);
-    } finally {
-      setUploading(false);
+      if (user) {
+        await supabase
+          .from('user_facial_enrollments')
+          .delete()
+          .eq('user_id', user.id);
+        await supabase.storage
+          .from('facial-recognition')
+          .remove([`${user.id}/`]);
+      }
+    } catch (cleanupError) {
+      console.error('Cleanup error:', cleanupError);
     }
-  };
-
+    
+    return false;
+  } finally {
+    setUploading(false);
+  }
+};
   const handleToggle = async (e: CustomEvent) => {
     const isEnabled = e.detail.checked;
     setEnabled(isEnabled);
