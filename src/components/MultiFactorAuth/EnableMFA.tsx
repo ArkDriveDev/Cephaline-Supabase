@@ -13,7 +13,6 @@ import {
   IonCardContent,
   IonCardHeader,
   IonCardTitle,
-  IonActionSheet,
   IonAlert,
   IonSpinner
 } from '@ionic/react';
@@ -21,8 +20,6 @@ import { supabase } from '../../utils/supaBaseClient';
 import {
   copyOutline,
   checkmarkDoneOutline,
-  eyeOutline,
-  timeOutline,
   refreshOutline
 } from 'ionicons/icons';
 import { useCopyToClipboard } from 'react-use';
@@ -40,7 +37,6 @@ const EnableMFA: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
-  const [showMFASelection, setShowMFASelection] = useState(false);
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
@@ -54,40 +50,44 @@ const EnableMFA: React.FC = () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw error;
-
+  
         if (user) {
           setUser(user);
-
+  
           // Check recovery codes
-          const { data: codesData } = await supabase
+          const { data: codesData, error: codesError } = await supabase
             .from('recovery_codes')
             .select('code_hash, code_status')
             .eq('user_id', user.id)
             .eq('code_status', 'active');
-
+  
+          if (codesError) throw codesError;
+  
           // Check TOTP status
           const { count: totpCount } = await supabase
             .from('totp_codes')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', user.id)
             .is('used_at', null);
-
+  
           // Check Facial Recognition
           const { data: facialFiles } = await supabase.storage
             .from('facial-recognition')
             .list(`${user.id}/`);
-
+  
           const hasTOTP = (totpCount ?? 0) > 0;
           const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
-
-          setIsEnabled(hasTOTP || hasFacial);
+  
           if (codesData) setRecoveryCodes(codesData);
-
-          // Set active method
+          
+          // MFA is enabled if we have recovery codes or active methods
+          setIsEnabled((codesData && codesData.length > 0) || hasTOTP || hasFacial);
+          
+          // Set active method (prioritize TOTP if both exist)
           setActiveMFAMethod(
             hasTOTP ? 'totp' :
-              hasFacial ? 'facial' :
-                null
+            hasFacial ? 'facial' :
+            null
           );
         }
       } catch (error) {
@@ -136,32 +136,26 @@ const EnableMFA: React.FC = () => {
   const handleToggle = async (e: CustomEvent) => {
     const enabled = e.detail.checked;
     if (enabled) {
-      setShowMFASelection(true);
+      // When enabling, generate recovery codes if none exist
+      if (recoveryCodes.length === 0) {
+        try {
+          setPendingToggle(true);
+          const codes = await generateRecoveryCodes(user?.id || '');
+          setRecoveryCodes(codes);
+          setIsEnabled(true);
+          setToastMessage('MFA enabled with recovery codes!');
+          setShowToast(true);
+        } catch (error) {
+          setToastMessage('Failed to enable MFA');
+          setShowToast(true);
+        } finally {
+          setPendingToggle(false);
+        }
+      } else {
+        setIsEnabled(true);
+      }
     } else {
       setShowDisableConfirm(true);
-    }
-  };
-
-  // Handle MFA method selection
-  const handleMFASelection = async (method: 'totp' | 'facial') => {
-    setShowMFASelection(false);
-    setPendingToggle(true);
-
-    try {
-      // Generate recovery codes (required for both methods)
-      const codes = await generateRecoveryCodes(user?.id || '');
-      setRecoveryCodes(codes);
-
-      // Set the active method
-      setActiveMFAMethod(method);
-      setIsEnabled(true);
-
-      setToastMessage(`MFA (${method.toUpperCase()}) enabled successfully!`);
-    } catch (error) {
-      setToastMessage('Failed to enable MFA');
-    } finally {
-      setPendingToggle(false);
-      setShowToast(true);
     }
   };
 
@@ -184,6 +178,52 @@ const EnableMFA: React.FC = () => {
       setShowToast(true);
     } finally {
       setPendingToggle(false);
+    }
+  };
+
+  // Handle TOTP toggle changes
+  const handleTotpToggleChange = async (enabled: boolean) => {
+    if (enabled) {
+      setActiveMFAMethod('totp');
+      setIsEnabled(true);
+      // Generate recovery codes if none exist
+      if (recoveryCodes.length === 0) {
+        try {
+          const codes = await generateRecoveryCodes(user?.id || '');
+          setRecoveryCodes(codes);
+        } catch (error) {
+          setToastMessage('Failed to generate recovery codes');
+          setShowToast(true);
+        }
+      }
+    } else {
+      // Only update the active method, don't affect main MFA state
+      if (activeMFAMethod === 'totp') {
+        setActiveMFAMethod(null);
+      }
+    }
+  };
+
+  // Handle Facial Recognition toggle changes
+  const handleFacialToggleChange = async (enabled: boolean) => {
+    if (enabled) {
+      setActiveMFAMethod('facial');
+      setIsEnabled(true);
+      // Generate recovery codes if none exist
+      if (recoveryCodes.length === 0) {
+        try {
+          const codes = await generateRecoveryCodes(user?.id || '');
+          setRecoveryCodes(codes);
+        } catch (error) {
+          setToastMessage('Failed to generate recovery codes');
+          setShowToast(true);
+        }
+      }
+    } else {
+      // Only update the active method, don't affect main MFA state
+      if (activeMFAMethod === 'facial') {
+        setActiveMFAMethod(null);
+      }
     }
   };
 
@@ -294,66 +334,28 @@ const EnableMFA: React.FC = () => {
             <TotpToggle
               userId={user?.id || ''}
               initialEnabled={activeMFAMethod === 'totp'}
-              onToggleChange={(enabled) => {
-                if (enabled) {
-                  setActiveMFAMethod('totp');
-                } else if (activeMFAMethod === 'totp') {
-                  setActiveMFAMethod(null);
-                  setIsEnabled(false);
-                }
-              }}
-              disabled={activeMFAMethod === 'facial'}
+              onToggleChange={handleTotpToggleChange}
+              disabled={false}
             />
 
             <FacialRecognitionToggle
               initialEnabled={activeMFAMethod === 'facial'}
-              onToggleChange={(enabled) => {
-                if (enabled) {
-                  setActiveMFAMethod('facial');
-                } else if (activeMFAMethod === 'facial') {
-                  setActiveMFAMethod(null);
-                  setIsEnabled(false);
-                }
-              }}
-              disabled={activeMFAMethod === 'totp'}
+              onToggleChange={handleFacialToggleChange}
+              disabled={false}
             />
           </div>
-
         </>
       )}
 
-      <IonActionSheet
-        isOpen={showMFASelection}
-        onDidDismiss={() => setShowMFASelection(false)}
-        header="Select MFA Method"
-        buttons={[
-          {
-            text: 'Authenticator App (TOTP)',
-            icon: timeOutline,
-            handler: () => handleMFASelection('totp')
-          },
-          {
-            text: 'Facial Recognition',
-            icon: eyeOutline,
-            handler: () => handleMFASelection('facial')
-          },
-          {
-            text: 'Cancel',
-            role: 'cancel'
-          }
-        ]}
-      />
-
       <IonAlert
         isOpen={showDisableConfirm}
-        onDidDismiss={() => confirmDisableMFA(false)}
+        onDidDismiss={() => setShowDisableConfirm(false)}
         header="Disable MFA?"
         message="Are you sure you want to disable Multi-Factor Authentication? This will make your account less secure."
         buttons={[
           {
             text: 'Cancel',
-            role: 'cancel',
-            handler: () => confirmDisableMFA(false)
+            role: 'cancel'
           },
           {
             text: 'Disable',
