@@ -19,15 +19,20 @@ import { supabase } from '../../utils/supaBaseClient';
 
 interface TotpToggleProps {
   userId: string;
+  initialEnabled?: boolean;
   onToggleChange?: (enabled: boolean) => void;
+  disabled?: boolean;
 }
 
-const TotpToggle: React.FC<TotpToggleProps> = ({ userId, onToggleChange }) => {
-  const [isEnabled, setIsEnabled] = useState(false);
+const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
+  initialEnabled = false,
+  onToggleChange,
+  disabled}) => {
   const [totpSecret, setTotpSecret] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(initialEnabled);
 
   // Generate TOTP secret
   const generateNewSecret = useCallback((): string => {

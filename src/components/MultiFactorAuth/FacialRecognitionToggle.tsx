@@ -17,10 +17,14 @@ import { camera } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
 
 interface Props {
+    initialEnabled?: boolean;
     onToggleChange: (enabled: boolean) => void;
-}
+    disabled?: boolean;
+  }
 
-const FacialRecognitionToggle: React.FC<Props> = ({ onToggleChange }) => {
+const FacialRecognitionToggle: React.FC<Props> = ({ initialEnabled = false, 
+  onToggleChange,
+  disabled }) => {
     const [enabled, setEnabled] = useState(false);
     const [photo, setPhoto] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -28,6 +32,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({ onToggleChange }) => {
     const [alertMessage, setAlertMessage] = useState('');
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [isEnabled, setIsEnabled] = useState(initialEnabled);
 
     // Check for existing photo on component mount
     useEffect(() => {
