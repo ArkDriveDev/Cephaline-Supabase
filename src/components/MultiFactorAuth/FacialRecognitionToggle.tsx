@@ -255,6 +255,7 @@ const uploadPhoto = async (blob: Blob) => {
     }
 
     setPhoto(signedUrlData.signedUrl);
+    setEnabled(true); // Add this line to enable the toggle
     setToastMessage('Face registration successful!');
     setShowToast(true);
     return true;
@@ -285,19 +286,24 @@ const uploadPhoto = async (blob: Blob) => {
     setUploading(false);
   }
 };
-  const handleToggle = async (e: CustomEvent) => {
-    const isEnabled = e.detail.checked;
-    setEnabled(isEnabled);
-    onToggleChange(isEnabled);
-
-    if (isEnabled) {
-      if (!photo) {
-        await startCamera();
-      }
-    } else {
-      setPhoto(null);
-    }
-  };
+ const handleToggle = async (e: CustomEvent) => {
+  const isEnabled = e.detail.checked;
+  
+  // If already enabled and we're turning it off
+  if (enabled && !isEnabled) {
+    setEnabled(false);
+    setPhoto(null);
+    onToggleChange(false);
+    return;
+  }
+  
+  // If enabling and we don't have a photo
+  if (isEnabled && !photo) {
+    setEnabled(true); // Optimistically set to true
+    onToggleChange(true);
+    await startCamera();
+  }
+};
 
   const closeCamera = () => {
     if (videoRef.current?.srcObject) {
