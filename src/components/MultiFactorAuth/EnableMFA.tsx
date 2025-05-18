@@ -21,13 +21,11 @@ import { supabase } from '../../utils/supaBaseClient';
 import {
   copyOutline,
   checkmarkDoneOutline,
-  fingerPrintOutline,
   eyeOutline,
-  micOutline,
-  timeOutline
+  timeOutline,
+  refreshOutline
 } from 'ionicons/icons';
 import { useCopyToClipboard } from 'react-use';
-import { refreshOutline } from 'ionicons/icons';
 import TotpToggle from './TotpToggle';
 import FacialRecognitionToggle from './FacialRecognitionToggle';
 
@@ -46,7 +44,6 @@ const EnableMFA: React.FC = () => {
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [pendingToggle, setPendingToggle] = useState(false);
   const [state, copyToClipboard] = useCopyToClipboard();
-  const [selectedMFAMethod, setSelectedMFAMethod] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [activeMFAMethod, setActiveMFAMethod] = useState<'totp' | 'facial' | null>(null);
@@ -57,7 +54,7 @@ const EnableMFA: React.FC = () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw error;
-  
+
         if (user) {
           setUser(user);
           
@@ -67,26 +64,26 @@ const EnableMFA: React.FC = () => {
             .select('code_hash, code_status')
             .eq('user_id', user.id)
             .eq('code_status', 'active');
-  
-          // Check TOTP - using count for more reliable check
+
+          // Check TOTP status
           const { count: totpCount } = await supabase
             .from('totp_codes')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', user.id)
             .is('used_at', null);
-  
+
           // Check Facial Recognition
           const { data: facialFiles } = await supabase.storage
             .from('facial-recognition')
             .list(`${user.id}/`);
-  
+
           const hasTOTP = (totpCount ?? 0) > 0;
           const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
           
           setIsEnabled(hasTOTP || hasFacial);
           if (codesData) setRecoveryCodes(codesData);
           
-          // Set active method (prioritize TOTP if both exist)
+          // Set active method
           setActiveMFAMethod(
             hasTOTP ? 'totp' :
             hasFacial ? 'facial' :
@@ -95,6 +92,8 @@ const EnableMFA: React.FC = () => {
         }
       } catch (error) {
         console.error('Error checking MFA status:', error);
+        setToastMessage('Failed to load MFA status');
+        setShowToast(true);
       } finally {
         setLoadingUser(false);
       }
@@ -152,11 +151,11 @@ const EnableMFA: React.FC = () => {
       // Generate recovery codes (required for both methods)
       const codes = await generateRecoveryCodes(user?.id || '');
       setRecoveryCodes(codes);
-
+      
       // Set the active method
       setActiveMFAMethod(method);
       setIsEnabled(true);
-
+      
       setToastMessage(`MFA (${method.toUpperCase()}) enabled successfully!`);
     } catch (error) {
       setToastMessage('Failed to enable MFA');
@@ -165,7 +164,6 @@ const EnableMFA: React.FC = () => {
       setShowToast(true);
     }
   };
-
 
   // Disable MFA
   const confirmDisableMFA = async (confirm: boolean) => {
@@ -177,7 +175,7 @@ const EnableMFA: React.FC = () => {
       await deleteAllRecoveryCodes(user?.id || '');
       setRecoveryCodes([]);
       setIsEnabled(false);
-      setSelectedMFAMethod(null);
+      setActiveMFAMethod(null);
       setToastMessage('MFA disabled successfully!');
       setShowToast(true);
     } catch (error: any) {
@@ -292,27 +290,46 @@ const EnableMFA: React.FC = () => {
             </IonCard>
           )}
 
-          {selectedMFAMethod === 'totp' && (
-            <TotpToggle
-              userId={user?.id || ''}
-              onToggleChange={(enabled) => {
-                if (!enabled) {
-                  setSelectedMFAMethod(null);
-                }
-              }}
-            />
-          )}
+          <IonCard>
+            <IonCardContent>
+              <IonItem>
+                <IonLabel color={activeMFAMethod === 'totp' ? 'primary' : 'medium'}>
+                  Authenticator App (TOTP)
+                </IonLabel>
+                <TotpToggle
+                  userId={user?.id || ''}
+                  initialEnabled={activeMFAMethod === 'totp'}
+                  onToggleChange={(enabled) => {
+                    if (enabled) {
+                      setActiveMFAMethod('totp');
+                    } else if (activeMFAMethod === 'totp') {
+                      setActiveMFAMethod(null);
+                      setIsEnabled(false);
+                    }
+                  }}
+                  disabled={activeMFAMethod === 'facial'}
+                />
+              </IonItem>
 
-          {activeMFAMethod === 'facial' && (
-            <FacialRecognitionToggle
-              onToggleChange={(enabled) => {
-                if (!enabled) {
-                  setActiveMFAMethod(null);
-                  setIsEnabled(false);
-                }
-              }}
-            />
-          )}
+              <IonItem>
+                <IonLabel color={activeMFAMethod === 'facial' ? 'primary' : 'medium'}>
+                  Facial Recognition
+                </IonLabel>
+                <FacialRecognitionToggle
+                  initialEnabled={activeMFAMethod === 'facial'}
+                  onToggleChange={(enabled) => {
+                    if (enabled) {
+                      setActiveMFAMethod('facial');
+                    } else if (activeMFAMethod === 'facial') {
+                      setActiveMFAMethod(null);
+                      setIsEnabled(false);
+                    }
+                  }}
+                  disabled={activeMFAMethod === 'totp'}
+                />
+              </IonItem>
+            </IonCardContent>
+          </IonCard>
         </>
       )}
 
@@ -324,14 +341,12 @@ const EnableMFA: React.FC = () => {
           {
             text: 'Authenticator App (TOTP)',
             icon: timeOutline,
-            handler: () => handleMFASelection('totp'),
-            disabled: activeMFAMethod === 'totp' // Disable if already active
+            handler: () => handleMFASelection('totp')
           },
           {
             text: 'Facial Recognition',
             icon: eyeOutline,
-            handler: () => handleMFASelection('facial'),
-            disabled: activeMFAMethod === 'facial' // Disable if already active
+            handler: () => handleMFASelection('facial')
           },
           {
             text: 'Cancel',
