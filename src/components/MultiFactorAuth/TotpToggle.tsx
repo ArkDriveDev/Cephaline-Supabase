@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  IonContent,
   IonToggle,
   IonLabel,
   IonButton,
@@ -24,17 +23,18 @@ interface TotpToggleProps {
   disabled?: boolean;
 }
 
-const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
+const TotpToggle: React.FC<TotpToggleProps> = ({
+  userId,
   initialEnabled = false,
   onToggleChange,
-  disabled}) => {
+  disabled
+}) => {
   const [totpSecret, setTotpSecret] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
 
-  // Generate TOTP secret
   const generateNewSecret = useCallback((): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     const randomValues = new Uint32Array(16);
@@ -46,8 +46,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
     return result.match(/.{4}/g)?.join(' ') || '';
   }, []);
 
-  // Check if TOTP is already enabled
-  const checkTotpStatus = useCallback(async (): Promise<{enabled: boolean, secret?: string}> => {
+  const checkTotpStatus = useCallback(async (): Promise<{ enabled: boolean, secret?: string }> => {
     try {
       const { data, error } = await supabase
         .from('totp_codes')
@@ -67,7 +66,6 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
     }
   }, [userId]);
 
-  // Initialize component
   useEffect(() => {
     const initialize = async () => {
       if (userId) {
@@ -86,19 +84,16 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
     initialize();
   }, [userId, checkTotpStatus]);
 
-  // Store or remove TOTP secret
   const updateTotpStatus = useCallback(async (enable: boolean): Promise<boolean> => {
     setIsLoading(true);
     try {
       if (enable) {
         const secret = generateNewSecret();
-        // Delete any existing codes
         await supabase
           .from('totp_codes')
           .delete()
           .eq('user_id', userId);
-        
-        // Insert new code
+
         const { error } = await supabase
           .from('totp_codes')
           .insert({
@@ -111,7 +106,6 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
         setTotpSecret(secret);
         return true;
       } else {
-        // Disable by marking all codes as used
         const { error } = await supabase
           .from('totp_codes')
           .update({ used_at: new Date().toISOString() })
@@ -141,8 +135,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
       setIsEnabled(enabled);
       onToggleChange?.(enabled);
     } else {
-      // Revert toggle if operation failed
-      setIsEnabled(!enabled);
+      setIsEnabled(!enabled); // Revert if failed
     }
   };
 
@@ -159,7 +152,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
   };
 
   return (
-    <IonContent className="ion-padding">
+    <div className="ion-padding">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <IonLabel>
           <strong>Authenticator App (TOTP)</strong>
@@ -170,7 +163,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
           <IonToggle
             checked={isEnabled}
             onIonChange={handleToggle}
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           />
         )}
       </div>
@@ -184,9 +177,9 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
                   <IonCol>
                     <IonText>
                       <h3 style={{ margin: 0 }}>Secret Key:</h3>
-                      <p style={{ 
-                        fontFamily: 'monospace', 
-                        fontSize: '1.1rem', 
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: '1.1rem',
                         letterSpacing: '1px',
                         wordBreak: 'break-all',
                         margin: '8px 0'
@@ -230,7 +223,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({ userId,
         duration={2000}
         position="top"
       />
-    </IonContent>
+    </div>
   );
 };
 

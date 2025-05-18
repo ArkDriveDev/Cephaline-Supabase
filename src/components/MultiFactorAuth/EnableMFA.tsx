@@ -57,7 +57,7 @@ const EnableMFA: React.FC = () => {
 
         if (user) {
           setUser(user);
-          
+
           // Check recovery codes
           const { data: codesData } = await supabase
             .from('recovery_codes')
@@ -79,15 +79,15 @@ const EnableMFA: React.FC = () => {
 
           const hasTOTP = (totpCount ?? 0) > 0;
           const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
-          
+
           setIsEnabled(hasTOTP || hasFacial);
           if (codesData) setRecoveryCodes(codesData);
-          
+
           // Set active method
           setActiveMFAMethod(
             hasTOTP ? 'totp' :
-            hasFacial ? 'facial' :
-            null
+              hasFacial ? 'facial' :
+                null
           );
         }
       } catch (error) {
@@ -151,11 +151,11 @@ const EnableMFA: React.FC = () => {
       // Generate recovery codes (required for both methods)
       const codes = await generateRecoveryCodes(user?.id || '');
       setRecoveryCodes(codes);
-      
+
       // Set the active method
       setActiveMFAMethod(method);
       setIsEnabled(true);
-      
+
       setToastMessage(`MFA (${method.toUpperCase()}) enabled successfully!`);
     } catch (error) {
       setToastMessage('Failed to enable MFA');
@@ -290,46 +290,35 @@ const EnableMFA: React.FC = () => {
             </IonCard>
           )}
 
-          <IonCard>
-            <IonCardContent>
-              <IonItem>
-                <IonLabel color={activeMFAMethod === 'totp' ? 'primary' : 'medium'}>
-                  Authenticator App (TOTP)
-                </IonLabel>
-                <TotpToggle
-                  userId={user?.id || ''}
-                  initialEnabled={activeMFAMethod === 'totp'}
-                  onToggleChange={(enabled) => {
-                    if (enabled) {
-                      setActiveMFAMethod('totp');
-                    } else if (activeMFAMethod === 'totp') {
-                      setActiveMFAMethod(null);
-                      setIsEnabled(false);
-                    }
-                  }}
-                  disabled={activeMFAMethod === 'facial'}
-                />
-              </IonItem>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', marginTop: '10px' }}>
+            <TotpToggle
+              userId={user?.id || ''}
+              initialEnabled={activeMFAMethod === 'totp'}
+              onToggleChange={(enabled) => {
+                if (enabled) {
+                  setActiveMFAMethod('totp');
+                } else if (activeMFAMethod === 'totp') {
+                  setActiveMFAMethod(null);
+                  setIsEnabled(false);
+                }
+              }}
+              disabled={activeMFAMethod === 'facial'}
+            />
 
-              <IonItem>
-                <IonLabel color={activeMFAMethod === 'facial' ? 'primary' : 'medium'}>
-                  Facial Recognition
-                </IonLabel>
-                <FacialRecognitionToggle
-                  initialEnabled={activeMFAMethod === 'facial'}
-                  onToggleChange={(enabled) => {
-                    if (enabled) {
-                      setActiveMFAMethod('facial');
-                    } else if (activeMFAMethod === 'facial') {
-                      setActiveMFAMethod(null);
-                      setIsEnabled(false);
-                    }
-                  }}
-                  disabled={activeMFAMethod === 'totp'}
-                />
-              </IonItem>
-            </IonCardContent>
-          </IonCard>
+            <FacialRecognitionToggle
+              initialEnabled={activeMFAMethod === 'facial'}
+              onToggleChange={(enabled) => {
+                if (enabled) {
+                  setActiveMFAMethod('facial');
+                } else if (activeMFAMethod === 'facial') {
+                  setActiveMFAMethod(null);
+                  setIsEnabled(false);
+                }
+              }}
+              disabled={activeMFAMethod === 'totp'}
+            />
+          </div>
+
         </>
       )}
 
