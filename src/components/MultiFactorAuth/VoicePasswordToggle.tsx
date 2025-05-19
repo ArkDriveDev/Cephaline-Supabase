@@ -6,6 +6,8 @@ import {
   IonToast,
   IonSpinner,
   IonToggle,
+  IonCard,
+  IonCardContent,
 } from '@ionic/react';
 
 interface VoicePasswordToggleProps {
@@ -84,7 +86,9 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     <>
       {/* Label and Toggle: side by side, left aligned */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-        <IonLabel style={{ marginLeft: '1rem' }}><strong>Enable Voice Password</strong></IonLabel>
+        <IonLabel style={{ marginLeft: '1rem' }}>
+          <strong>Enable Voice Password</strong>
+        </IonLabel>
         {isProcessing ? (
           <IonSpinner style={{ marginLeft: '1rem' }} name="crescent" />
         ) : (
@@ -99,31 +103,33 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
       {/* Show form if enabled */}
       {enabled && (
-        <>
-          <IonInput
-            label="Enter voice password"
-            labelPlacement="floating"
-            value={voicePassword}
-            onIonChange={(e) => setVoicePassword(e.detail.value!)}
-            disabled={isProcessing || disabled}
-          />
-          <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
-            <IonButton
-              onClick={handleSubmit}
-              disabled={isProcessing || disabled || !voicePassword.trim()}
-            >
-              {isProcessing ? 'Saving...' : 'Submit'}
-            </IonButton>
-            <IonButton
-              fill="outline"
-              color="danger"
-              onClick={handleCancel}
+        <IonCard style={{ width: '100%', maxWidth: '400px', marginLeft: '1rem' }}>
+          <IonCardContent>
+            <IonInput
+              label="Enter voice password"
+              labelPlacement="floating"
+              value={voicePassword}
+              onIonChange={(e) => setVoicePassword(e.detail.value!)}
               disabled={isProcessing || disabled}
-            >
-              Cancel
-            </IonButton>
-          </div>
-        </>
+            />
+            <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
+              <IonButton
+                onClick={handleSubmit}
+                disabled={isProcessing || disabled || !voicePassword.trim()}
+              >
+                {isProcessing ? 'Saving...' : 'Submit'}
+              </IonButton>
+              <IonButton
+                fill="outline"
+                color="danger"
+                onClick={handleCancel}
+                disabled={isProcessing || disabled}
+              >
+                Cancel
+              </IonButton>
+            </div>
+          </IonCardContent>
+        </IonCard>
       )}
 
       <IonToast
