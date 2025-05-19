@@ -311,7 +311,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
                     }}
                   />
                   <IonText color="success">
-                    <p>Profile photo saved</p>
+                    <p>Facial credential saved</p>
                   </IonText>
                 </IonCol>
               </IonRow>
