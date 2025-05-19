@@ -1,12 +1,36 @@
-import React from 'react';
-import { IonItem, IonLabel, IonToggle } from '@ionic/react';
+import React, { useState } from 'react';
+import {
+  IonItem,
+  IonLabel,
+  IonToggle,
+  IonInput,
+  IonButton,
+  IonList,
+} from '@ionic/react';
 
 const VoicePasswordToggle: React.FC = () => {
+  const [enabled, setEnabled] = useState(false);
+
   return (
-    <IonItem>
-      <IonLabel>Voice password</IonLabel>
-      <IonToggle slot="end" />
-    </IonItem>
+    <IonList>
+      <IonItem>
+        <IonLabel>Voice password</IonLabel>
+        <IonToggle
+          slot="end"
+          checked={enabled}
+          onIonChange={(e) => setEnabled(e.detail.checked)}
+        />
+      </IonItem>
+
+      {enabled && (
+        <>
+          <IonItem>
+            <IonInput label="Enter voice password" labelPlacement="floating" />
+          </IonItem>
+          <IonButton expand="block">Submit</IonButton>
+        </>
+      )}
+    </IonList>
   );
 };
 
