@@ -22,6 +22,7 @@ import {
 } from '@ionic/react';
 import { camera, close } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
+import * as faceapi from 'face-api.js';
 
 interface Props {
   initialEnabled?: boolean;
@@ -41,16 +42,29 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [captureStatus, setCaptureStatus] = useState('');
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check for existing photo on component mount
+  // Load face detection models on component mount
   useEffect(() => {
-    checkExistingPhoto();
-  }, []);
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        await faceapi.nets.faceExpressionNet.loadFromUri('/models');
+        setModelsLoaded(true);
+      } catch (error) {
+        console.error('Failed to load face detection models:', error);
+        setToastMessage('Face detection features unavailable');
+        setShowToast(true);
+      }
+    };
 
-  useEffect(() => {
+    loadModels();
+    checkExistingPhoto();
+
     return () => {
       // Clean up camera stream and interval when component unmounts
       if (videoRef.current?.srcObject) {
@@ -62,10 +76,41 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     };
   }, []);
 
-   const capturePhoto = async () => {
+  const checkExistingPhoto = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) return;
+
+      const { data: enrollment, error: dbError } = await supabase
+        .from('user_facial_enrollments')
+        .select('storage_path')
+        .eq('user_id', user.id)
+        .single();
+
+      if (dbError || !enrollment) return;
+
+      const { data: signedUrlData, error: urlError } = await supabase.storage
+        .from('facial-recognition')
+        .createSignedUrl(enrollment.storage_path, 3600);
+
+      if (urlError || !signedUrlData) {
+        throw urlError || new Error('Failed to generate signed URL');
+      }
+
+      setPhoto(signedUrlData.signedUrl);
+      setEnabled(true);
+      onToggleChange(true);
+    } catch (error) {
+      console.error('Photo check error:', error);
+      setToastMessage('Failed to load existing face data');
+      setShowToast(true);
+    }
+  };
+
+  const capturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
-    setCaptureStatus('Capturing photo...');
+    setCaptureStatus('Processing photo...');
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -79,7 +124,11 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     
     canvas.toBlob(async (blob) => {
       if (blob) {
-        await uploadPhoto(blob);
+        const success = await uploadPhoto(blob);
+        if (!success) {
+          setEnabled(false);
+          onToggleChange(false);
+        }
       }
       
       // Stop camera stream
@@ -92,7 +141,6 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   };
 
   const compareImageData = (img1: ImageData, img2: ImageData): number => {
-    // Simple image difference calculation
     let diff = 0;
     for (let i = 0; i < img1.data.length; i += 4) {
       diff += Math.abs(img1.data[i] - img2.data[i]) + 
@@ -102,9 +150,31 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     return diff / (img1.width * img1.height * 3);
   };
 
+  const detectSmile = async (canvas: HTMLCanvasElement): Promise<boolean> => {
+    if (!modelsLoaded) return false;
+    
+    try {
+      const detections = await faceapi.detectAllFaces(
+        canvas, 
+        new faceapi.TinyFaceDetectorOptions()
+      ).withFaceLandmarks().withFaceExpressions();
+      
+      if (detections.length > 0) {
+        const expressions = detections[0].expressions;
+        const smileProbability = expressions.happy;
+        return smileProbability > 0.85; // Adjust threshold as needed
+      }
+      return false;
+    } catch (error) {
+      console.error('Smile detection error:', error);
+      return false;
+    }
+  };
+
   const startStabilityCheck = () => {
     let lastImageData: ImageData | null = null;
     let stableCount = 0;
+    let smileDetected = false;
     
     captureIntervalRef.current = setInterval(async () => {
       if (!videoRef.current || !canvasRef.current) return;
@@ -119,6 +189,21 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
+      // First try smile detection
+      if (modelsLoaded && !smileDetected) {
+        const isSmiling = await detectSmile(canvas);
+        if (isSmiling) {
+          smileDetected = true;
+          setCaptureStatus('Smile detected! Capturing...');
+          if (captureIntervalRef.current) {
+            clearInterval(captureIntervalRef.current);
+          }
+          await capturePhoto();
+          return;
+        }
+      }
+      
+      // Fallback to stability check if smile detection fails
       const currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
       
       if (lastImageData) {
@@ -129,7 +214,6 @@ const FacialRecognitionToggle: React.FC<Props> = ({
           setCaptureStatus(`Hold still... (${stableCount}/3)`);
           
           if (stableCount >= 3) {
-            // Stable enough - capture photo
             if (captureIntervalRef.current) {
               clearInterval(captureIntervalRef.current);
             }
@@ -137,7 +221,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
           }
         } else {
           stableCount = 0;
-          setCaptureStatus('Hold still...');
+          setCaptureStatus(modelsLoaded ? 'Smile for the camera!' : 'Hold still...');
         }
       }
       
@@ -145,16 +229,16 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     }, 500);
   };
 
-   const startCamera = async () => {
+  const startCamera = async () => {
     try {
       setShowCameraModal(true);
-      setCaptureStatus('Preparing camera...');
+      setCaptureStatus('Initializing camera...');
       
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          facingMode: 'user' // Front camera
+          facingMode: 'user'
         }
       });
       
@@ -163,147 +247,106 @@ const FacialRecognitionToggle: React.FC<Props> = ({
         videoRef.current.play();
       }
       
-      setCaptureStatus('Position your face in the frame...');
-      
-      // Start checking for stable image
+      setCaptureStatus(modelsLoaded ? 'Smile for the camera!' : 'Position your face in the frame...');
       startStabilityCheck();
     } catch (error) {
       console.error('Camera error:', error);
       setToastMessage('Please enable camera permissions');
       setShowToast(true);
       setEnabled(false);
+      onToggleChange(false);
       setShowCameraModal(false);
     }
   };
 
- // Update these functions in your component:
-
-const checkExistingPhoto = async () => {
-  try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return;
-
-    // 1. Check database record first
-    const { data: enrollment, error: dbError } = await supabase
-      .from('user_facial_enrollments')
-      .select('storage_path')
-      .eq('user_id', user.id)
-      .single();
-
-    if (dbError || !enrollment) return;
-
-    // 2. Get signed URL for private bucket - updated response handling
-    const { data: signedUrlData, error: urlError } = await supabase.storage
-      .from('facial-recognition')
-      .createSignedUrl(enrollment.storage_path, 3600); // 1 hour expiry
-
-    if (urlError || !signedUrlData) {
-      throw urlError || new Error('Failed to generate signed URL');
-    }
-
-    setPhoto(signedUrlData.signedUrl);
-    setEnabled(true);
-  } catch (error) {
-    console.error('Photo check error:', error);
-    setToastMessage('Failed to load existing face data');
-    setShowToast(true);
-  }
-};
-
-const uploadPhoto = async (blob: Blob) => {
-  setUploading(true);
-  try {
-    // 1. Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
-
-    // 2. Prepare file metadata
-    const fileName = `profile_${Date.now()}.jpg`;
-    const filePath = `${user.id}/${fileName}`;
-    const fileExt = fileName.split('.').pop();
-
-    // 3. Upload to storage
-    const { error: uploadError } = await supabase.storage
-      .from('facial-recognition')
-      .upload(filePath, blob, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
-      });
-
-    if (uploadError) throw uploadError;
-
-    // 4. Store reference in database
-    const { error: dbError } = await supabase
-      .from('user_facial_enrollments')
-      .upsert({
-        user_id: user.id,
-        storage_path: filePath
-      }, {
-        onConflict: 'user_id'
-      });
-
-    if (dbError) throw dbError;
-
-    // 5. Get signed URL - updated response handling
-    const { data: signedUrlData, error: urlError } = await supabase.storage
-      .from('facial-recognition')
-      .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-    if (urlError || !signedUrlData) {
-      throw urlError || new Error('Failed to generate signed URL');
-    }
-
-    setPhoto(signedUrlData.signedUrl);
-    setEnabled(true); // Add this line to enable the toggle
-    setToastMessage('Face registration successful!');
-    setShowToast(true);
-    return true;
-  } catch (error) {
-    console.error('Upload error:', error);
-    setToastMessage(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    setShowToast(true);
-    setEnabled(false);
-    
-    // Clean up if partially completed
+  const uploadPhoto = async (blob: Blob) => {
+    setUploading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('user_facial_enrollments')
-          .delete()
-          .eq('user_id', user.id);
-        await supabase.storage
-          .from('facial-recognition')
-          .remove([`${user.id}/`]);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
+
+      const fileName = `profile_${Date.now()}.jpg`;
+      const filePath = `${user.id}/${fileName}`;
+      const fileExt = fileName.split('.').pop();
+
+      const { error: uploadError } = await supabase.storage
+        .from('facial-recognition')
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from('user_facial_enrollments')
+        .upsert({
+          user_id: user.id,
+          storage_path: filePath
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (dbError) throw dbError;
+
+      const { data: signedUrlData, error: urlError } = await supabase.storage
+        .from('facial-recognition')
+        .createSignedUrl(filePath, 3600);
+
+      if (urlError || !signedUrlData) {
+        throw urlError || new Error('Failed to generate signed URL');
       }
-    } catch (cleanupError) {
-      console.error('Cleanup error:', cleanupError);
+
+      setPhoto(signedUrlData.signedUrl);
+      setEnabled(true);
+      onToggleChange(true);
+      setToastMessage('Face registration successful!');
+      setShowToast(true);
+      return true;
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToastMessage(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowToast(true);
+      return false;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleToggle = async (e: CustomEvent) => {
+    const isEnabled = e.detail.checked;
+    
+    if (enabled && !isEnabled) {
+      // Disabling facial recognition
+      setEnabled(false);
+      setPhoto(null);
+      onToggleChange(false);
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from('user_facial_enrollments')
+            .delete()
+            .eq('user_id', user.id);
+          await supabase.storage
+            .from('facial-recognition')
+            .remove([`${user.id}/`]);
+        }
+      } catch (error) {
+        console.error('Cleanup error:', error);
+      }
+      
+      return;
     }
     
-    return false;
-  } finally {
-    setUploading(false);
-  }
-};
- const handleToggle = async (e: CustomEvent) => {
-  const isEnabled = e.detail.checked;
-  
-  // If already enabled and we're turning it off
-  if (enabled && !isEnabled) {
-    setEnabled(false);
-    setPhoto(null);
-    onToggleChange(false);
-    return;
-  }
-  
-  // If enabling and we don't have a photo
-  if (isEnabled && !photo) {
-    setEnabled(true); // Optimistically set to true
-    onToggleChange(true);
-    await startCamera();
-  }
-};
+    if (isEnabled && !photo) {
+      setEnabled(true); // Optimistically enable
+      onToggleChange(true);
+      await startCamera();
+    }
+  };
 
   const closeCamera = () => {
     if (videoRef.current?.srcObject) {
@@ -313,7 +356,12 @@ const uploadPhoto = async (blob: Blob) => {
       clearInterval(captureIntervalRef.current);
     }
     setShowCameraModal(false);
-    setEnabled(false);
+    
+    // If we don't have a photo yet, reset the toggle
+    if (!photo) {
+      setEnabled(false);
+      onToggleChange(false);
+    }
   };
 
   return (
@@ -328,10 +376,16 @@ const uploadPhoto = async (blob: Blob) => {
           <IonToggle
             checked={enabled}
             onIonChange={handleToggle}
-            disabled={uploading || disabled}
+            disabled={uploading || disabled || !modelsLoaded}
           />
         )}
       </div>
+
+      {!modelsLoaded && (
+        <IonText color="warning">
+          <p>Loading face detection features...</p>
+        </IonText>
+      )}
 
       {photo && (
         <IonCard>
@@ -394,7 +448,7 @@ const uploadPhoto = async (blob: Blob) => {
                 maxWidth: '500px',
                 borderRadius: '8px',
                 margin: '0 auto',
-                transform: 'scaleX(-1)' // Mirror effect
+                transform: 'scaleX(-1)'
               }}
             />
             <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -417,7 +471,7 @@ const uploadPhoto = async (blob: Blob) => {
         isOpen={showToast}
         onDidDismiss={() => setShowToast(false)}
         message={toastMessage}
-        duration={2000}
+        duration={3000}
         position="top"
       />
     </div>
