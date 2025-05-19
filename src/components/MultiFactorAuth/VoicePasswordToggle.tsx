@@ -9,6 +9,7 @@ import {
   IonCard,
   IonCardContent,
 } from '@ionic/react';
+import { supabase } from '../../utils/supaBaseClient'; // Adjust the import path as needed
 
 interface VoicePasswordToggleProps {
   initialEnabled: boolean;
@@ -27,10 +28,47 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastColor, setToastColor] = useState<'success' | 'warning' | 'danger'>('success');
+  const [hasExistingPassword, setHasExistingPassword] = useState(false);
+
+  useEffect(() => {
+    checkExistingVoicePassword();
+  }, []);
 
   useEffect(() => {
     setEnabled(initialEnabled);
   }, [initialEnabled]);
+
+  const checkExistingVoicePassword = async () => {
+    try {
+      setIsProcessing(true);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.log('No authenticated user');
+        return;
+      }
+
+      const { data: voicePasswordData, error } = await supabase
+        .from('user_voice_passwords')
+        .select('password')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !voicePasswordData) {
+        console.log('No existing voice password found');
+        return;
+      }
+
+      setVoicePassword(voicePasswordData.password);
+      setHasExistingPassword(true);
+      setEnabled(true);
+      onToggleChange(true);
+    } catch (error) {
+      console.error('Error checking for voice password:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleToggleChange = (checked: boolean) => {
     if (!checked) {
@@ -51,12 +89,28 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     setIsProcessing(true);
 
     try {
-      await saveVoicePassword(voicePassword);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
+
+      // Upsert the voice password
+      const { error } = await supabase
+        .from('user_voice_passwords')
+        .upsert({
+          user_id: user.id,
+          password: voicePassword
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) throw error;
+
       setToastMessage('Voice password saved successfully');
       setToastColor('success');
       setEnabled(true);
+      setHasExistingPassword(true);
       onToggleChange(true);
-    } catch {
+    } catch (error) {
+      console.error('Error saving voice password:', error);
       setToastMessage('Failed to save voice password');
       setToastColor('danger');
       setEnabled(false);
@@ -67,24 +121,33 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     }
   };
 
-  const handleCancel = () => {
-    setVoicePassword('');
-    setEnabled(false);
-    onToggleChange(false);
-  };
+  const handleCancel = async () => {
+    setIsProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('user_voice_passwords')
+          .delete()
+          .eq('user_id', user.id);
+      }
 
-  const saveVoicePassword = async (password: string) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log('Saving voice password:', password);
-        resolve({ success: true });
-      }, 1000);
-    });
+      setVoicePassword('');
+      setEnabled(false);
+      setHasExistingPassword(false);
+      onToggleChange(false);
+    } catch (error) {
+      console.error('Error removing voice password:', error);
+      setToastMessage('Failed to remove voice password');
+      setToastColor('danger');
+      setShowToast(true);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
     <>
-      {/* Label and Toggle: side by side, left aligned */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
         <IonLabel style={{ marginLeft: '1rem' }}>
           <strong>Enable Voice Password</strong>
@@ -101,33 +164,56 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
         )}
       </div>
 
-      {/* Show form if enabled */}
       {enabled && (
         <IonCard style={{ width: '100%', maxWidth: '400px', marginLeft: '1rem' }}>
           <IonCardContent>
-            <IonInput
-              label="Enter voice password"
-              labelPlacement="floating"
-              value={voicePassword}
-              onIonChange={(e) => setVoicePassword(e.detail.value!)}
-              disabled={isProcessing || disabled}
-            />
-            <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
-              <IonButton
-                onClick={handleSubmit}
-                disabled={isProcessing || disabled || !voicePassword.trim()}
-              >
-                {isProcessing ? 'Saving...' : 'Submit'}
-              </IonButton>
-              <IonButton
-                fill="outline"
-                color="danger"
-                onClick={handleCancel}
-                disabled={isProcessing || disabled}
-              >
-                Cancel
-              </IonButton>
-            </div>
+            {hasExistingPassword ? (
+              <>
+                <IonInput
+                  label="Your voice password is saved"
+                  labelPlacement="floating"
+                  value="********"
+                  disabled
+                  type="password"
+                />
+                <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
+                  <IonButton
+                    color="danger"
+                    onClick={handleCancel}
+                    disabled={isProcessing || disabled}
+                  >
+                    Remove Voice Password
+                  </IonButton>
+                </div>
+              </>
+            ) : (
+              <>
+                <IonInput
+                  label="Enter voice password"
+                  labelPlacement="floating"
+                  value={voicePassword}
+                  onIonChange={(e) => setVoicePassword(e.detail.value!)}
+                  disabled={isProcessing || disabled}
+                  type="password"
+                />
+                <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
+                  <IonButton
+                    onClick={handleSubmit}
+                    disabled={isProcessing || disabled || !voicePassword.trim()}
+                  >
+                    {isProcessing ? 'Saving...' : 'Submit'}
+                  </IonButton>
+                  <IonButton
+                    fill="outline"
+                    color="danger"
+                    onClick={handleCancel}
+                    disabled={isProcessing || disabled}
+                  >
+                    Cancel
+                  </IonButton>
+                </div>
+              </>
+            )}
           </IonCardContent>
         </IonCard>
       )}
