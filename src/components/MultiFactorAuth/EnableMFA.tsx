@@ -25,6 +25,7 @@ import {
 import { useCopyToClipboard } from 'react-use';
 import TotpToggle from './TotpToggle';
 import FacialRecognitionToggle from './FacialRecognitionToggle';
+import VoicePasswordToggle from './VoicePasswordToggle';
 
 interface User {
   id: string;
@@ -42,7 +43,7 @@ const EnableMFA: React.FC = () => {
   const [state, copyToClipboard] = useCopyToClipboard();
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [activeMFAMethod, setActiveMFAMethod] = useState<'totp' | 'facial' | null>(null);
+  const [activeMFAMethod, setActiveMFAMethod] = useState<'totp' | 'facial' | 'voice' | null>(null);
 
   // Check MFA status on load
   useEffect(() => {
@@ -75,18 +76,28 @@ const EnableMFA: React.FC = () => {
             .from('facial-recognition')
             .list(`${user.id}/`);
   
+          // Check Voice Password
+          const { data: voiceData } = await supabase
+            .from('voice_passwords')
+            .select('*')
+            .eq('user_id', user.id)
+            .is('verified_at', null)
+            .single();
+  
           const hasTOTP = (totpCount ?? 0) > 0;
           const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
+          const hasVoice = voiceData !== null;
   
           if (codesData) setRecoveryCodes(codesData);
           
           // MFA is enabled if we have recovery codes or active methods
-          setIsEnabled((codesData && codesData.length > 0) || hasTOTP || hasFacial);
+          setIsEnabled((codesData && codesData.length > 0) || hasTOTP || hasFacial || hasVoice);
           
-          // Set active method (prioritize TOTP if both exist)
+          // Set active method (prioritize TOTP if multiple exist)
           setActiveMFAMethod(
             hasTOTP ? 'totp' :
             hasFacial ? 'facial' :
+            hasVoice ? 'voice' :
             null
           );
         }
@@ -227,6 +238,29 @@ const EnableMFA: React.FC = () => {
     }
   };
 
+  // Handle Voice Password toggle changes
+  const handleVoiceToggleChange = async (enabled: boolean) => {
+    if (enabled) {
+      setActiveMFAMethod('voice');
+      setIsEnabled(true);
+      // Generate recovery codes if none exist
+      if (recoveryCodes.length === 0) {
+        try {
+          const codes = await generateRecoveryCodes(user?.id || '');
+          setRecoveryCodes(codes);
+        } catch (error) {
+          setToastMessage('Failed to generate recovery codes');
+          setShowToast(true);
+        }
+      }
+    } else {
+      // Only update the active method, don't affect main MFA state
+      if (activeMFAMethod === 'voice') {
+        setActiveMFAMethod(null);
+      }
+    }
+  };
+
   // Copy recovery codes
   const copyCodes = () => {
     const codesText = recoveryCodes.map(code => code.code_hash).join('\n');
@@ -341,6 +375,12 @@ const EnableMFA: React.FC = () => {
             <FacialRecognitionToggle
               initialEnabled={activeMFAMethod === 'facial'}
               onToggleChange={handleFacialToggleChange}
+              disabled={false}
+            />
+
+            <VoicePasswordToggle
+              initialEnabled={activeMFAMethod === 'voice'}
+              onToggleChange={handleVoiceToggleChange}
               disabled={false}
             />
           </div>
