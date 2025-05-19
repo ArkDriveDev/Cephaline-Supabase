@@ -9,7 +9,7 @@ import {
   IonCard,
   IonCardContent,
 } from '@ionic/react';
-import { supabase } from '../../utils/supaBaseClient'; // Adjust the import path as needed
+import { supabase } from '../../utils/supaBaseClient';
 
 interface VoicePasswordToggleProps {
   initialEnabled: boolean;
@@ -70,12 +70,16 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     }
   };
 
-  const handleToggleChange = (checked: boolean) => {
-    if (!checked) {
+  const handleToggleChange = async (checked: boolean) => {
+    if (!checked && hasExistingPassword) {
+      // If turning off and there's an existing password, delete it
+      await handleCancel();
+    } else {
+      // Otherwise just update local state
       setVoicePassword('');
+      setEnabled(checked);
+      onToggleChange(checked);
     }
-    setEnabled(checked);
-    onToggleChange(checked);
   };
 
   const handleSubmit = async () => {
@@ -92,7 +96,6 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
 
-      // Upsert the voice password
       const { error } = await supabase
         .from('user_voice_passwords')
         .upsert({
@@ -136,6 +139,9 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       setEnabled(false);
       setHasExistingPassword(false);
       onToggleChange(false);
+      setToastMessage('Voice password removed');
+      setToastColor('success');
+      setShowToast(true);
     } catch (error) {
       console.error('Error removing voice password:', error);
       setToastMessage('Failed to remove voice password');
