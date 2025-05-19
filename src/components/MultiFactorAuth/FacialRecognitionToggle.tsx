@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   IonToggle,
   IonLabel,
@@ -43,7 +43,14 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const checkExistingPhoto = async () => {
+  useEffect(() => {
+    // Check for existing photo when component mounts
+    if (initialEnabled) {
+      checkExistingPhoto();
+    }
+  }, []);
+
+ const checkExistingPhoto = async () => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
@@ -62,20 +69,24 @@ const FacialRecognitionToggle: React.FC<Props> = ({
         return;
       }
       
-      const { data: { publicUrl } } = supabase.storage
+      // Corrected this part - the response structure is different
+      const { data: signedUrlData, error: urlError } = await supabase.storage
         .from('facial-recognition')
-        .getPublicUrl(enrollment.storage_path);
+        .createSignedUrl(enrollment.storage_path, 3600);
 
-      if (!publicUrl) {
-        throw new Error('Failed to generate public URL');
+      if (urlError || !signedUrlData) {
+        throw new Error('Failed to generate signed URL');
       }
 
-      const imgTest = await fetch(publicUrl);
+      const signedUrl = signedUrlData.signedUrl;
+
+      // Test if the image is accessible
+      const imgTest = await fetch(signedUrl);
       if (!imgTest.ok) {
         throw new Error('Image not found in storage');
       }
 
-      setPhoto(publicUrl);
+      setPhoto(signedUrl);
       setEnabled(true);
       onToggleChange(true);
     } catch (error) {
@@ -149,57 +160,59 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     }
   };
 
-  const uploadPhoto = async (blob: Blob) => {
-    setUploading(true);
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
+ const uploadPhoto = async (blob: Blob) => {
+  setUploading(true);
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error(authError?.message || 'Not authenticated');
 
-      const fileName = `profile_${Date.now()}.jpg`;
-      const filePath = `${user.id}/${fileName}`;
-      const fileExt = fileName.split('.').pop();
+    const fileName = `profile_${Date.now()}.jpg`;
+    const filePath = `${user.id}/${fileName}`;
+    const fileExt = fileName.split('.').pop();
 
-      const { error: uploadError } = await supabase.storage
-        .from('facial-recognition')
-        .upload(filePath, blob, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
-        });
+    // Upload the file
+    const { error: uploadError } = await supabase.storage
+      .from('facial-recognition')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
+      });
 
-      if (uploadError) throw uploadError;
+    if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
-        .from('user_facial_enrollments')
-        .upsert({
-          user_id: user.id,
-          storage_path: filePath
-        }, {
-          onConflict: 'user_id'
-        });
+    // Update database record
+    const { error: dbError } = await supabase
+      .from('user_facial_enrollments')
+      .upsert({
+        user_id: user.id,
+        storage_path: filePath
+      }, {
+        onConflict: 'user_id'
+      });
 
-      if (dbError) throw dbError;
+    if (dbError) throw dbError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('facial-recognition')
-        .getPublicUrl(filePath);
+    // Get public URL (for public buckets)
+    const { data: { publicUrl } } = supabase.storage
+      .from('facial-recognition')
+      .getPublicUrl(filePath);
 
-      setPhoto(publicUrl);
-      setEnabled(true);
-      onToggleChange(true);
-      setToastMessage('Photo uploaded successfully!');
-      setShowToast(true);
-    } catch (error) {
-      console.error('Upload error:', error);
-      setToastMessage(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setShowToast(true);
-      setEnabled(false);
-      onToggleChange(false);
-    } finally {
-      setUploading(false);
-    }
-  };
-
+    setPhoto(publicUrl);
+    setEnabled(true);
+    onToggleChange(true);
+    setToastMessage('Photo uploaded successfully!');
+    setShowToast(true);
+  } catch (error) {
+    console.error('Upload error:', error);
+    setToastMessage(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    setShowToast(true);
+    setEnabled(false);
+    onToggleChange(false);
+  } finally {
+    setUploading(false);
+  }
+};
   const handleToggle = async (e: CustomEvent) => {
     const isEnabled = e.detail.checked;
     
@@ -211,13 +224,25 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          // First get the file path from the database
+          const { data: enrollment } = await supabase
+            .from('user_facial_enrollments')
+            .select('storage_path')
+            .eq('user_id', user.id)
+            .single();
+
+          // Delete from database
           await supabase
             .from('user_facial_enrollments')
             .delete()
             .eq('user_id', user.id);
-          await supabase.storage
-            .from('facial-recognition')
-            .remove([`${user.id}/`]);
+
+          // If we have a storage path, delete from storage
+          if (enrollment?.storage_path) {
+            await supabase.storage
+              .from('facial-recognition')
+              .remove([enrollment.storage_path]);
+          }
         }
       } catch (error) {
         console.error('Cleanup error:', error);
@@ -276,6 +301,13 @@ const FacialRecognitionToggle: React.FC<Props> = ({
                       borderRadius: '50%',
                       margin: '0 auto',
                       objectFit: 'cover'
+                    }}
+                    onError={() => {
+                      setToastMessage('Photo failed to load. Please refresh.');
+                      setShowToast(true);
+                      setPhoto(null);
+                      setEnabled(false);
+                      onToggleChange(false);
                     }}
                   />
                   <IonText color="success">
