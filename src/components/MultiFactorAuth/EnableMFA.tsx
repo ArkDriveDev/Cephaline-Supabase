@@ -171,26 +171,47 @@ const EnableMFA: React.FC = () => {
   };
 
   // Disable MFA
-  const confirmDisableMFA = async (confirm: boolean) => {
-    setShowDisableConfirm(false);
-    if (!confirm) return;
+ // Disable MFA
+const confirmDisableMFA = async (confirm: boolean) => {
+  setShowDisableConfirm(false);
+  if (!confirm || !user) return;
 
-    setPendingToggle(true);
-    try {
-      await deleteAllRecoveryCodes(user?.id || '');
-      setRecoveryCodes([]);
-      setIsEnabled(false);
-      setActiveMFAMethod(null);
-      setToastMessage('MFA disabled successfully!');
-      setShowToast(true);
-    } catch (error: any) {
-      console.error('Error disabling MFA:', error);
-      setToastMessage(error.message || 'Failed to disable MFA');
-      setShowToast(true);
-    } finally {
-      setPendingToggle(false);
-    }
-  };
+  setPendingToggle(true);
+  try {
+    // Delete all recovery codes
+    await deleteAllRecoveryCodes(user.id);
+
+    // Delete TOTP codes
+    await supabase
+      .from('totp_codes')
+      .delete()
+      .eq('user_id', user.id);
+
+    // Delete facial recognition file from storage
+    await supabase.storage
+      .from('facial-recognition')
+      .remove([`${user.id}/profile.jpg`]);
+
+    // Delete voice password
+    await supabase
+      .from('user_voice_passwords')
+      .delete()
+      .eq('user_id', user.id);
+
+    // Update state
+    setRecoveryCodes([]);
+    setIsEnabled(false);
+    setActiveMFAMethod(null);
+    setToastMessage('MFA disabled and data cleared successfully!');
+    setShowToast(true);
+  } catch (error: any) {
+    console.error('Error disabling MFA:', error);
+    setToastMessage(error.message || 'Failed to fully disable MFA');
+    setShowToast(true);
+  } finally {
+    setPendingToggle(false);
+  }
+};
 
   // Handle TOTP toggle changes
   const handleTotpToggleChange = async (enabled: boolean) => {
