@@ -43,22 +43,62 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [captureStatus, setCaptureStatus] = useState('');
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsFailed, setModelsFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load face detection models on component mount
   useEffect(() => {
+    let mounted = true;
+
     const loadModels = async () => {
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-        await faceapi.nets.faceExpressionNet.loadFromUri('/models');
-        setModelsLoaded(true);
+        setModelsLoading(true);
+        setModelsFailed(false);
+        console.log('Starting to load face detection models...');
+        
+        const modelPath = '/models';
+        console.log('Loading models from:', modelPath);
+        
+        try {
+          const testResponse = await fetch(`${modelPath}/tiny_face_detector_model-weights_manifest.json`);
+          if (!testResponse.ok) throw new Error('Model manifest not found');
+        } catch (testError) {
+          console.error('Model accessibility test failed:', testError);
+          throw new Error(`Model files not found at ${modelPath}. Please ensure:
+            1. All model files are in the public/models directory
+            2. The files have correct names and extensions
+            3. The build process copied them to the output directory`);
+        }
+
+        const loadWithProgress = async (modelName: string, loader: Promise<void>) => {
+          console.log(`Loading ${modelName}...`);
+          await loader;
+          console.log(`${modelName} loaded successfully`);
+        };
+
+        await Promise.all([
+          loadWithProgress('TinyFaceDetector', faceapi.nets.tinyFaceDetector.loadFromUri(modelPath)),
+          loadWithProgress('FaceLandmark68Net', faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)),
+          loadWithProgress('FaceExpressionNet', faceapi.nets.faceExpressionNet.loadFromUri(modelPath))
+        ]);
+        
+        if (mounted) {
+          console.log('All models loaded successfully');
+          setModelsLoaded(true);
+          setModelsLoading(false);
+        }
       } catch (error) {
         console.error('Failed to load face detection models:', error);
-        setToastMessage('Face detection features unavailable');
-        setShowToast(true);
+        if (mounted) {
+          setToastMessage(`Failed to load face detection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setShowToast(true);
+          setModelsLoaded(false);
+          setModelsLoading(false);
+          setModelsFailed(true);
+        }
       }
     };
 
@@ -66,7 +106,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     checkExistingPhoto();
 
     return () => {
-      // Clean up camera stream and interval when component unmounts
+      mounted = false;
       if (videoRef.current?.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
       }
@@ -79,31 +119,59 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const checkExistingPhoto = async () => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) return;
+      if (authError || !user) {
+        console.log('No authenticated user');
+        return;
+      }
 
+      console.log('Checking for existing facial enrollment for user:', user.id);
+      
       const { data: enrollment, error: dbError } = await supabase
         .from('user_facial_enrollments')
         .select('storage_path')
         .eq('user_id', user.id)
         .single();
 
-      if (dbError || !enrollment) return;
-
-      const { data: signedUrlData, error: urlError } = await supabase.storage
-        .from('facial-recognition')
-        .createSignedUrl(enrollment.storage_path, 3600);
-
-      if (urlError || !signedUrlData) {
-        throw urlError || new Error('Failed to generate signed URL');
+      if (dbError || !enrollment?.storage_path) {
+        console.log('No existing enrollment found');
+        return;
       }
 
-      setPhoto(signedUrlData.signedUrl);
+      console.log('Found enrollment, storage path:', enrollment.storage_path);
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('facial-recognition')
+        .getPublicUrl(enrollment.storage_path);
+
+      if (!publicUrl) {
+        throw new Error('Failed to generate public URL');
+      }
+
+      const imgTest = await fetch(publicUrl);
+      if (!imgTest.ok) {
+        throw new Error('Image not found in storage');
+      }
+
+      setPhoto(publicUrl);
       setEnabled(true);
       onToggleChange(true);
+      console.log('Existing photo loaded successfully');
     } catch (error) {
       console.error('Photo check error:', error);
-      setToastMessage('Failed to load existing face data');
+      setToastMessage('Failed to load existing face data. Please re-register.');
       setShowToast(true);
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from('user_facial_enrollments')
+            .delete()
+            .eq('user_id', user.id);
+        }
+      } catch (cleanupError) {
+        console.error('Cleanup failed:', cleanupError);
+      }
     }
   };
 
@@ -131,7 +199,6 @@ const FacialRecognitionToggle: React.FC<Props> = ({
         }
       }
       
-      // Stop camera stream
       if (video.srcObject) {
         (video.srcObject as MediaStream).getTracks().forEach(track => track.stop());
       }
@@ -162,7 +229,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       if (detections.length > 0) {
         const expressions = detections[0].expressions;
         const smileProbability = expressions.happy;
-        return smileProbability > 0.85; // Adjust threshold as needed
+        return smileProbability > 0.85;
       }
       return false;
     } catch (error) {
@@ -189,7 +256,6 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // First try smile detection
       if (modelsLoaded && !smileDetected) {
         const isSmiling = await detectSmile(canvas);
         if (isSmiling) {
@@ -203,13 +269,12 @@ const FacialRecognitionToggle: React.FC<Props> = ({
         }
       }
       
-      // Fallback to stability check if smile detection fails
       const currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
       
       if (lastImageData) {
         const diff = compareImageData(lastImageData, currentImageData);
         
-        if (diff < 5) { // Very similar images (stable)
+        if (diff < 5) {
           stableCount++;
           setCaptureStatus(`Hold still... (${stableCount}/3)`);
           
@@ -318,7 +383,6 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     const isEnabled = e.detail.checked;
     
     if (enabled && !isEnabled) {
-      // Disabling facial recognition
       setEnabled(false);
       setPhoto(null);
       onToggleChange(false);
@@ -342,22 +406,25 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     }
     
     if (isEnabled && !photo) {
-      setEnabled(true); // Optimistically enable
+      setEnabled(true);
       onToggleChange(true);
       await startCamera();
     }
   };
 
   const closeCamera = () => {
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-    }
     if (captureIntervalRef.current) {
       clearInterval(captureIntervalRef.current);
+      captureIntervalRef.current = null;
     }
+    
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    
     setShowCameraModal(false);
     
-    // If we don't have a photo yet, reset the toggle
     if (!photo) {
       setEnabled(false);
       onToggleChange(false);
@@ -376,14 +443,26 @@ const FacialRecognitionToggle: React.FC<Props> = ({
           <IonToggle
             checked={enabled}
             onIonChange={handleToggle}
-            disabled={uploading || disabled || !modelsLoaded}
+            disabled={uploading || disabled || modelsLoading || modelsFailed}
           />
         )}
       </div>
 
-      {!modelsLoaded && (
-        <IonText color="warning">
-          <p>Loading face detection features...</p>
+      {modelsLoading && (
+        <IonText color="medium">
+          <p>Loading face detection features... <IonSpinner name="lines" /></p>
+        </IonText>
+      )}
+
+      {modelsFailed && (
+        <IonText color="danger">
+          <p>Face detection unavailable. Please refresh the page to try again.</p>
+        </IonText>
+      )}
+
+      {!modelsLoading && !modelsFailed && !modelsLoaded && (
+        <IonText color="medium">
+          <p>Face detection features initializing...</p>
         </IonText>
       )}
 
