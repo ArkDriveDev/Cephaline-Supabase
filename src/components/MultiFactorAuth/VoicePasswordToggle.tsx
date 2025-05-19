@@ -11,6 +11,25 @@ import {
 const VoicePasswordToggle: React.FC = () => {
   const [enabled, setEnabled] = useState(false);
 
+  // Function to handle toggle change
+  const handleToggleChange = (checked: boolean) => {
+    setEnabled(checked);
+  };
+
+  // Function to render input and button
+  const renderInputAndButton = () => {
+    if (!enabled) return null;
+
+    return (
+      <>
+        <IonItem>
+          <IonInput label="Enter voice password" labelPlacement="floating" />
+        </IonItem>
+        <IonButton expand="block">Submit</IonButton>
+      </>
+    );
+  };
+
   return (
     <IonList>
       <IonItem>
@@ -18,18 +37,11 @@ const VoicePasswordToggle: React.FC = () => {
         <IonToggle
           slot="end"
           checked={enabled}
-          onIonChange={(e) => setEnabled(e.detail.checked)}
+          onIonChange={(e) => handleToggleChange(e.detail.checked)}
         />
       </IonItem>
 
-      {enabled && (
-        <>
-          <IonItem>
-            <IonInput label="Enter voice password" labelPlacement="floating" />
-          </IonItem>
-          <IonButton expand="block">Submit</IonButton>
-        </>
-      )}
+      {renderInputAndButton()}
     </IonList>
   );
 };
