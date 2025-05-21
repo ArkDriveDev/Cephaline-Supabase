@@ -11,11 +11,12 @@ import {
   IonCol,
   IonToast,
   IonText,
-  IonSpinner
+  IonSpinner,
+  IonAlert
 } from '@ionic/react';
 import { copyOutline } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
-import * as otplib from 'otplib';
+import { TOTP } from 'otpauth';
 
 interface TotpToggleProps {
   userId: string;
@@ -35,24 +36,37 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
+  const [showDisableAlert, setShowDisableAlert] = useState(false);
 
-  // Generate a proper TOTP secret
+  // Generate a new TOTP secret
   const generateNewSecret = useCallback((): string => {
-    return otplib.authenticator.generateSecret(); // Generates a base32 secret
-  }, []);
+    const totp = new TOTP({
+      issuer: 'Cephaline-Supabase',
+      label: 'Cephaline-Supabase:' + userId,
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+    });
+    return totp.secret.base32;
+  }, [userId]);
 
+  // Check if TOTP is enabled by looking for active secrets
   const checkTotpStatus = useCallback(async (): Promise<{ enabled: boolean, secret?: string }> => {
     try {
       const { data, error } = await supabase
-        .from('user_totp_secrets')
-        .select('secret')
+        .from('totp_codes')
+        .select('secret_key')
         .eq('user_id', userId)
+        .is('used_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
+      
       return {
-        enabled: !!data?.secret,
-        secret: data?.secret
+        enabled: !!data?.secret_key,
+        secret: data?.secret_key
       };
     } catch (error) {
       console.error('Error checking TOTP status:', error);
@@ -68,7 +82,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
           const { enabled, secret } = await checkTotpStatus();
           setIsEnabled(enabled);
           if (enabled && secret) {
-            setTotpSecret(secret.match(/.{4}/g)?.join(' ') || secret);
+            setTotpSecret(secret);
           }
         } finally {
           setIsLoading(false);
@@ -78,69 +92,89 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
     initialize();
   }, [userId, checkTotpStatus]);
 
-  const updateTotpStatus = useCallback(async (enable: boolean): Promise<boolean> => {
+  const enableTotp = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
-      if (enable) {
-        const secret = generateNewSecret();
-        
-        const { error: deleteError } = await supabase
-          .from('user_totp_secrets')
-          .delete()
-          .eq('user_id', userId);
-  
-        if (deleteError && deleteError.code !== 'PGRST116') throw deleteError;
-  
-        const { error: insertError } = await supabase
-          .from('user_totp_secrets')
-          .insert({
-            user_id: userId,
-            secret: secret,
-            created_at: new Date().toISOString()
-          });
-  
-        if (insertError) throw insertError;
-  
-        setTotpSecret(secret.match(/.{4}/g)?.join(' ') || secret);
-        return true;
-      } else {
-        const { error: deleteError } = await supabase
-          .from('user_totp_secrets')
-          .delete()
-          .eq('user_id', userId);
-  
-        if (deleteError && deleteError.code !== 'PGRST116') throw deleteError;
-  
-        setTotpSecret('');
-        return true;
-      }
+      const secret = generateNewSecret();
+      const code = new TOTP({ secret }).generate(); // Generate initial code
+      
+      // Set expiration 5 minutes from now
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+      
+      const { error } = await supabase
+        .from('totp_codes')
+        .insert({
+          user_id: userId,
+          code: code,
+          secret_key: secret,
+          expires_at: expiresAt.toISOString()
+        });
+
+      if (error) throw error;
+
+      setTotpSecret(secret);
+      return true;
     } catch (error: any) {
-      console.error('Error updating TOTP:', error);
-      setToastMessage(error.message || 'Failed to update TOTP');
+      console.error('Error enabling TOTP:', error);
+      setToastMessage(error.message || 'Failed to enable TOTP');
       setShowToast(true);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [userId, generateNewSecret]);
+  };
 
+ const disableTotp = async (): Promise<boolean> => {
+  setIsLoading(true);
+  try {
+    // Delete all TOTP records for this user
+    const { error } = await supabase
+      .from('totp_codes')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    setTotpSecret('');
+    return true;
+  } catch (error: any) {
+    console.error('Error disabling TOTP:', error);
+    setToastMessage(error.message || 'Failed to disable TOTP');
+    setShowToast(true);
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+};
   const handleToggle = async (event: CustomEvent) => {
     const enabled = event.detail.checked;
     if (isLoading) return;
 
-    const success = await updateTotpStatus(enabled);
-    if (success) {
-      setIsEnabled(enabled);
-      onToggleChange?.(enabled);
+    if (enabled) {
+      const success = await enableTotp();
+      if (success) {
+        setIsEnabled(true);
+        onToggleChange?.(true);
+      }
     } else {
-      setIsEnabled(!enabled); // Revert if failed
+      setShowDisableAlert(true);
+    }
+  };
+
+  const confirmDisable = async () => {
+    setShowDisableAlert(false);
+    const success = await disableTotp();
+    if (success) {
+      setIsEnabled(false);
+      onToggleChange?.(false);
     }
   };
 
   const copyToClipboard = async () => {
     if (!totpSecret) return;
     try {
-      await navigator.clipboard.writeText(totpSecret.replace(/\s/g, ''));
+      await navigator.clipboard.writeText(totpSecret);
       setToastMessage('Copied to clipboard!');
       setShowToast(true);
     } catch (err) {
@@ -227,6 +261,23 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
         message={toastMessage}
         duration={2000}
         position="top"
+      />
+
+      <IonAlert
+        isOpen={showDisableAlert}
+        onDidDismiss={() => setShowDisableAlert(false)}
+        header={'Disable Two-Factor Authentication?'}
+        message={'Are you sure you want to disable this security feature?'}
+        buttons={[
+          {
+            text: 'Cancel',
+            role: 'cancel'
+          },
+          {
+            text: 'Disable',
+            handler: confirmDisable
+          }
+        ]}
       />
     </div>
   );

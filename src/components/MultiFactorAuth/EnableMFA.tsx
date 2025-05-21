@@ -182,11 +182,15 @@ const confirmDisableMFA = async (confirm: boolean) => {
     // 1. Delete all recovery codes
     await deleteAllRecoveryCodes(user.id);
 
-    // 2. Delete TOTP codes
-    await supabase
+    // 2. Delete TOTP codes - enhanced version with error handling
+    const { error: totpError, count: totpDeletedCount } = await supabase
       .from('totp_codes')
       .delete()
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('*', { count: 'exact', head: true }); // Returns count of deleted records
+
+    if (totpError) throw totpError;
+    console.log(`Deleted ${totpDeletedCount || 0} TOTP records`);
 
     // 3. Delete facial recognition database record
     const { error: facialEnrollmentError } = await supabase
@@ -196,55 +200,55 @@ const confirmDisableMFA = async (confirm: boolean) => {
     
     if (facialEnrollmentError) throw facialEnrollmentError;
 
-    // 4. Delete facial recognition file from storage (improved version)
+    // 4. Delete facial recognition files from storage (optimized)
     try {
-      // First list all files for this user
       const { data: files, error: listError } = await supabase.storage
         .from('facial-recognition')
         .list(user.id);
       
       if (listError) throw listError;
 
-      // Create array of files to delete
-      const filesToDelete = files.map(file => `${user.id}/${file.name}`);
-      
-      // Only try to delete if files exist
-      if (filesToDelete.length > 0) {
+      if (files && files.length > 0) {
+        const filePaths = files.map(file => `${user.id}/${file.name}`);
         const { error: deleteError } = await supabase.storage
           .from('facial-recognition')
-          .remove(filesToDelete);
+          .remove(filePaths);
         
         if (deleteError) throw deleteError;
-        console.log(`Deleted ${filesToDelete.length} facial recognition files`);
+        console.log(`Deleted ${filePaths.length} facial recognition files`);
       }
     } catch (storageError) {
-      console.error('Storage deletion error:', storageError);
-      // Try fallback method if listing fails
-      const { error: fallbackError } = await supabase.storage
-        .from('facial-recognition')
-        .remove([`${user.id}/profile.jpg`, `${user.id}/profile.jpeg`]);
-      
-      if (fallbackError) {
-        console.warn('Could not delete facial recognition files:', fallbackError);
-        // Continue with other operations even if file deletion fails
-      }
+      console.error('Facial storage cleanup error:', storageError);
+      // Non-critical failure - continue with other operations
     }
 
     // 5. Delete voice password
-    await supabase
+    const { error: voicePasswordError } = await supabase
       .from('user_voice_passwords')
       .delete()
       .eq('user_id', user.id);
+
+    if (voicePasswordError) throw voicePasswordError;
 
     // Update state
     setRecoveryCodes([]);
     setIsEnabled(false);
     setActiveMFAMethod(null);
-    setToastMessage('MFA disabled successfully!');
+    setToastMessage('All MFA methods disabled successfully!');
     setShowToast(true);
+    
+    // Optional: Log the MFA disable event
+    await supabase
+      .from('audit_logs')
+      .insert({
+        user_id: user.id,
+        action: 'mfa_disabled',
+        details: { methods: ['totp', 'recovery_codes', 'facial', 'voice'] }
+      });
+
   } catch (error: any) {
     console.error('Error disabling MFA:', error);
-    setToastMessage(error.message || 'MFA was disabled but some cleanup failed. Please contact support.');
+    setToastMessage(error.message || 'Failed to completely disable MFA. Some elements may remain active.');
     setShowToast(true);
   } finally {
     setPendingToggle(false);
