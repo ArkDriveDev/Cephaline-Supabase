@@ -14,7 +14,7 @@ import {
   IonCardContent,
   IonLoading,
 } from '@ionic/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
@@ -49,7 +49,7 @@ const Login: React.FC = () => {
 
   const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
 
- const checkTotpRequirement = async (userId: string) => {
+  const checkTotpRequirement = async (userId: string) => {
     try {
       const { data: secretData, error: secretError } = await supabase
         .from('user_totp') 
@@ -57,56 +57,77 @@ const Login: React.FC = () => {
         .eq('user_id', userId)
         .single();
 
-      // Ignore "not found" error
       if (secretError && secretError.code !== 'PGRST116') throw secretError;
-
-      // TOTP required if secret exists
-      return !!secretData?.secret;  // Changed from 'secret' to 'secret_key'
+      return !!secretData?.secret;
     } catch (error) {
       console.error('Error checking TOTP status:', error);
       return false;
     }
   };
 
- const doLogin = async () => {
-  try {
-    setIsLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+  const doLogin = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    console.log('User ID:', data.user?.id);
-    const requiresTotp = await checkTotpRequirement(data.user?.id);
-    console.log('TOTP required:', requiresTotp);
+      console.log('Login successful, user ID:', data.user?.id);
+      const requiresTotp = await checkTotpRequirement(data.user?.id);
+      console.log('TOTP required:', requiresTotp);
 
-    if (requiresTotp) {
-      setShowTotpModal(true);
-      setSession(data);
-      return; // This return prevents further execution
+      if (requiresTotp) {
+        setShowTotpModal(true);
+        setSession(data);
+        return;
+      }
+
+      // Direct login without TOTP
+      setShowToast(true);
+      setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
+    } catch (error: any) {
+      setAlertMessage(
+        error.message === 'Invalid login credentials'
+          ? 'Invalid email or password'
+          : error.message || 'Login failed'
+      );
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // Only proceed to homepage if TOTP is not required
+ const handleTotpSuccess = async () => {
+  setShowTotpModal(false);
+  
+  try {
+    const { data: { session }, error } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    
     setShowToast(true);
-    setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
-  } catch (error: any) {
-    setAlertMessage(
-      error.message === 'Invalid login credentials'
-        ? 'Invalid email or password'
-        : error.message || 'Login failed'
-    );
+    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+  } catch (error) {
+    console.error('Error refreshing session:', error);
+    setAlertMessage('Failed to establish session after verification');
     setShowAlert(true);
-  } finally {
-    setIsLoading(false);
   }
 };
-  const handleTotpSuccess = () => {
-    setShowTotpModal(false);
-    setShowToast(true);
-    setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
-  };
+  // Check for existing session on component mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const requiresTotp = await checkTotpRequirement(session.user.id);
+        if (!requiresTotp) {
+          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+        }
+      }
+    };
+    checkSession();
+  }, []);
 
   return (
     <IonPage>

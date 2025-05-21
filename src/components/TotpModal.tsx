@@ -22,7 +22,7 @@ interface TotpModalProps {
   isOpen: boolean;
   onDidDismiss: () => void;
   session: any;
-  onVerificationSuccess: () => void;
+  onVerificationSuccess: (session: any) => void;
 }
 
 const TotpModal: React.FC<TotpModalProps> = ({ 
@@ -36,12 +36,10 @@ const TotpModal: React.FC<TotpModalProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
 
   const verifyCode = async (code: string, secret: string) => {
-    // Verify code is valid format (6 digits)
     if (code.length !== 6 || !/^\d+$/.test(code)) {
       throw new Error('Code must be 6 digits');
     }
 
-    // Create TOTP instance with the stored secret
     const totp = new TOTP({
       secret: secret,
       digits: 6,
@@ -49,7 +47,6 @@ const TotpModal: React.FC<TotpModalProps> = ({
       algorithm: 'SHA1'
     });
 
-    // Verify the code
     const isValid = totp.validate({ token: code, window: 1 }) !== null;
     
     if (!isValid) {
@@ -67,7 +64,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
     setError('');
 
     try {
-      // 1. Get the user's TOTP secret
+      // Get the user's TOTP secret
       const { data: totpData, error: totpError } = await supabase
         .from('user_totp')
         .select('secret, is_verified')
@@ -78,10 +75,10 @@ const TotpModal: React.FC<TotpModalProps> = ({
         throw totpError || new Error('TOTP not configured for this account');
       }
 
-      // 2. Verify the code using otpauth
+      // Verify the code
       await verifyCode(code, totpData.secret);
 
-      // 3. Mark TOTP as verified if it wasn't already
+      // Mark TOTP as verified if needed
       if (!totpData.is_verified) {
         const { error: updateError } = await supabase
           .from('user_totp')
@@ -91,12 +88,12 @@ const TotpModal: React.FC<TotpModalProps> = ({
         if (updateError) throw updateError;
       }
 
-      // 4. Refresh session to update claims
+      // Refresh the session to get updated auth factors
       const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError) throw refreshError;
 
-      // 5. Complete login
-      onVerificationSuccess();
+      console.log('TOTP verification successful, new session:', newSession);
+      onVerificationSuccess(newSession);
     } catch (err: any) {
       console.error('TOTP verification error:', err);
       setError(err.message || 'Verification failed. Please try again.');
