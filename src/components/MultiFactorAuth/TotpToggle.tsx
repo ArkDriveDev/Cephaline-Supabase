@@ -15,6 +15,7 @@ import {
 } from '@ionic/react';
 import { copyOutline } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
+import * as otplib from 'otplib';
 
 interface TotpToggleProps {
   userId: string;
@@ -35,30 +36,23 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
 
+  // Generate a proper TOTP secret
   const generateNewSecret = useCallback((): string => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    const randomValues = new Uint32Array(16);
-    window.crypto.getRandomValues(randomValues);
-    let result = '';
-    randomValues.forEach(value => {
-      result += chars[value % chars.length];
-    });
-    return result.match(/.{4}/g)?.join(' ') || '';
+    return otplib.authenticator.generateSecret(); // Generates a base32 secret
   }, []);
 
   const checkTotpStatus = useCallback(async (): Promise<{ enabled: boolean, secret?: string }> => {
     try {
       const { data, error } = await supabase
-        .from('totp_codes')
-        .select('code_hash')
+        .from('user_totp_secrets')
+        .select('secret')
         .eq('user_id', userId)
-        .is('used_at', null)
-        .limit(1);
+        .single();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
       return {
-        enabled: !!data?.length,
-        secret: data?.[0]?.code_hash
+        enabled: !!data?.secret,
+        secret: data?.secret
       };
     } catch (error) {
       console.error('Error checking TOTP status:', error);
@@ -90,35 +84,32 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
       if (enable) {
         const secret = generateNewSecret();
         
-        // Delete all existing TOTP codes for this user (both used and unused)
         const { error: deleteError } = await supabase
-          .from('totp_codes')
+          .from('user_totp_secrets')
           .delete()
           .eq('user_id', userId);
   
-        if (deleteError) throw deleteError;
+        if (deleteError && deleteError.code !== 'PGRST116') throw deleteError;
   
-        // Insert new TOTP code
         const { error: insertError } = await supabase
-          .from('totp_codes')
+          .from('user_totp_secrets')
           .insert({
             user_id: userId,
-            code_hash: secret.replace(/\s/g, ''),
+            secret: secret,
             created_at: new Date().toISOString()
           });
   
         if (insertError) throw insertError;
   
-        setTotpSecret(secret);
+        setTotpSecret(secret.match(/.{4}/g)?.join(' ') || secret);
         return true;
       } else {
-        // Delete all TOTP codes for this user (simpler approach)
         const { error: deleteError } = await supabase
-          .from('totp_codes')
+          .from('user_totp_secrets')
           .delete()
           .eq('user_id', userId);
   
-        if (deleteError) throw deleteError;
+        if (deleteError && deleteError.code !== 'PGRST116') throw deleteError;
   
         setTotpSecret('');
         return true;
@@ -189,7 +180,8 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
                         fontSize: '1.1rem',
                         letterSpacing: '1px',
                         wordBreak: 'break-all',
-                        margin: '8px 0'
+                        margin: '8px 0',
+                        userSelect: 'all'
                       }}>
                         {totpSecret || 'Loading...'}
                       </p>
@@ -211,13 +203,19 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
 
           <div style={{ marginTop: '16px' }}>
             <IonText color="medium">
-              <p>How to setup:</p>
+              <p><strong>How to setup:</strong></p>
               <ol style={{ paddingLeft: '20px', margin: '8px 0' }}>
                 <li>Copy the secret key above</li>
-                <li>Open your authenticator app</li>
-                <li>Add new account and paste the key</li>
-                <li>Save and use the generated codes</li>
+                <li>Open your authenticator app (Google Authenticator, Authy, etc.)</li>
+                <li>Select "Enter a setup key" or similar option</li>
+                <li>Enter your account name (e.g., your email)</li>
+                <li>Paste the secret key</li>
+                <li>Select "Time-based" if given an option</li>
+                <li>Save the entry</li>
               </ol>
+              <p style={{ marginTop: '8px' }}>
+                <strong>Note:</strong> You'll need to enter the 6-digit code from your authenticator app when logging in.
+              </p>
             </IonText>
           </div>
         </>

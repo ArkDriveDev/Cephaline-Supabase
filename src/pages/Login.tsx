@@ -19,6 +19,7 @@ import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
+import * as otplib from 'otplib';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -46,122 +47,63 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
   const [session, setSession] = useState<any>(null);
-  const [totpCode, setTotpCode] = useState('');
 
   const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
 
   const checkTotpRequirement = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('totp_codes')
-        .select('*')
+        .from('user_totp_secrets')
+        .select('secret')
         .eq('user_id', userId)
-        .is('used_at', null);
-
-      if (error) {
-        console.error('Error checking TOTP:', error);
-        return false;
-      }
-
-      return data && data.length > 0;
-    } catch (error) {
-      console.error('Error checking TOTP:', error);
-      return false;
-    }
-  };
-
-  const verifyTotpCode = async (code: string) => {
-    if (!session?.user?.id) {
-      setAlertMessage('Session expired. Please login again.');
-      setShowAlert(true);
-      return false;
-    }
-
-    try {
-      setIsLoading(true);
-      
-      // First check if the code exists and is valid
-      const { data, error } = await supabase
-        .from('totp_codes')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('code_hash', code) // In production, hash the input code first
-        .is('used_at', null)
         .single();
 
-      if (error || !data) {
-        throw new Error('Invalid verification code');
-      }
-
-      // Mark the code as used
-      const { error: updateError } = await supabase
-        .from('totp_codes')
-        .update({ used_at: new Date().toISOString() })
-        .eq('id', data.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      return true;
-    } catch (error: any) {
-      console.error('TOTP verification error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleTotpSubmit = async () => {
-    try {
-      const isValid = await verifyTotpCode(totpCode);
-      if (isValid) {
-        setShowTotpModal(false);
-        setShowToast(true);
-        setTimeout(() => {
-          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-        }, 300);
-      }
-    } catch (error: any) {
-      setAlertMessage(error.message || 'Verification failed. Please try again.');
-      setShowAlert(true);
+      if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
+      return !!data?.secret;
+    } catch (error) {
+      console.error('Error checking TOTP status:', error);
+      return false;
     }
   };
 
   const doLogin = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
       if (error) throw error;
 
-      // Check if user has pending TOTP codes
-      const requiresTotp = await checkTotpRequirement(data.user.id);
+      // Check if user has TOTP enabled
+      const requiresTotp = await checkTotpRequirement(data.user?.id);
       
-      if (requiresTotp) {
-        setSession(data);
-        setShowTotpModal(true);
-      } else {
+      if (!requiresTotp) {
+        // No TOTP required, proceed to app
         setShowToast(true);
-        setTimeout(() => {
-          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-        }, 300);
+        setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
+      } else {
+        // TOTP required, show modal
+        setShowTotpModal(true);
+        setSession(data); // Store session for verification
       }
     } catch (error: any) {
-      setAlertMessage(error.message || 'Login failed. Please check your credentials.');
+      setAlertMessage(
+        error.message === 'Invalid login credentials'
+          ? 'Invalid email or password'
+          : error.message || 'Login failed'
+      );
       setShowAlert(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleTotpInputChange = (e: CustomEvent) => {
-    setTotpCode(e.detail.value);
-  };
-
-  const handleModalDismiss = () => {
+  const handleTotpSuccess = () => {
     setShowTotpModal(false);
-    supabase.auth.signOut();
+    setShowToast(true);
+    setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
   };
 
   return (
@@ -248,9 +190,14 @@ const Login: React.FC = () => {
           </IonCard>
         </div>
 
-        <TotpModal 
+        <TotpModal
           isOpen={showTotpModal}
-          onDidDismiss={handleModalDismiss}
+          onDidDismiss={() => {
+            setShowTotpModal(false);
+            supabase.auth.signOut();
+          }}
+          session={session}
+          onVerificationSuccess={handleTotpSuccess}
         />
       </IonContent>
     </IonPage>
