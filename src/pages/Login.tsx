@@ -52,8 +52,8 @@ const Login: React.FC = () => {
  const checkTotpRequirement = async (userId: string) => {
     try {
       const { data: secretData, error: secretError } = await supabase
-        .from('totp_codes')  // Changed from 'user_totp_secrets' to 'totp_codes'
-        .select('secret_key')  // Changed from 'secret' to 'secret_key'
+        .from('user_totp') 
+        .select('secret') 
         .eq('user_id', userId)
         .single();
 
@@ -61,7 +61,7 @@ const Login: React.FC = () => {
       if (secretError && secretError.code !== 'PGRST116') throw secretError;
 
       // TOTP required if secret exists
-      return !!secretData?.secret_key;  // Changed from 'secret' to 'secret_key'
+      return !!secretData?.secret;  // Changed from 'secret' to 'secret_key'
     } catch (error) {
       console.error('Error checking TOTP status:', error);
       return false;

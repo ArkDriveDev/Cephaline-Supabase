@@ -37,6 +37,7 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
   const [showDisableAlert, setShowDisableAlert] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
 
   // Generate a new TOTP secret
   const generateNewSecret = useCallback((): string => {
@@ -51,69 +52,69 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
   }, [userId]);
 
   // Check if TOTP is enabled by looking for active secrets
-  const checkTotpStatus = useCallback(async (): Promise<{ enabled: boolean, secret?: string }> => {
+  const checkTotpStatus = useCallback(async (): Promise<{ enabled: boolean, secret?: string, isVerified?: boolean }> => {
     try {
       const { data, error } = await supabase
-        .from('totp_codes')
-        .select('secret_key')
+        .from('user_totp')
+        .select('secret, is_verified')
         .eq('user_id', userId)
-        .is('used_at', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
       
       return {
-        enabled: !!data?.secret_key,
-        secret: data?.secret_key
+        enabled: !!data?.secret,
+        secret: data?.secret,
+        isVerified: data?.is_verified || false
       };
     } catch (error) {
       console.error('Error checking TOTP status:', error);
-      return { enabled: false };
+      return { enabled: false, isVerified: false };
     }
   }, [userId]);
 
-  useEffect(() => {
-    const initialize = async () => {
-      if (userId) {
-        setIsLoading(true);
-        try {
-          const { enabled, secret } = await checkTotpStatus();
-          setIsEnabled(enabled);
-          if (enabled && secret) {
-            setTotpSecret(secret);
-          }
-        } finally {
-          setIsLoading(false);
+ useEffect(() => {
+  const initialize = async () => {
+    if (userId) {
+      setIsLoading(true);
+      try {
+        const response = await checkTotpStatus();
+        console.log(response); // For debugging
+        const { enabled, secret, isVerified } = response;
+        setIsEnabled(enabled);
+        setIsVerified(isVerified ?? false); // Provide fallback
+        if (enabled && secret) {
+          setTotpSecret(secret);
         }
+      } catch (error) {
+        console.error("Error checking TOTP status:", error);
+      } finally {
+        setIsLoading(false);
       }
-    };
-    initialize();
-  }, [userId, checkTotpStatus]);
+    }
+  };
+  initialize();
+}, [userId, checkTotpStatus, setIsEnabled, setIsVerified, setTotpSecret, setIsLoading]);
 
   const enableTotp = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
       const secret = generateNewSecret();
-      const code = new TOTP({ secret }).generate(); // Generate initial code
       
-      // Set expiration 5 minutes from now
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 5);
-      
+      // Store the secret with is_verified false initially
       const { error } = await supabase
-        .from('totp_codes')
-        .insert({
+        .from('user_totp')
+        .upsert({
           user_id: userId,
-          code: code,
-          secret_key: secret,
-          expires_at: expiresAt.toISOString()
+          secret: secret,
+          is_verified: false,
+          updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
 
       setTotpSecret(secret);
+      setIsVerified(false);
       return true;
     } catch (error: any) {
       console.error('Error enabling TOTP:', error);
@@ -125,28 +126,30 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
     }
   };
 
- const disableTotp = async (): Promise<boolean> => {
-  setIsLoading(true);
-  try {
-    // Delete all TOTP records for this user
-    const { error } = await supabase
-      .from('totp_codes')
-      .delete()
-      .eq('user_id', userId);
+  const disableTotp = async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      // Delete the TOTP record
+      const { error } = await supabase
+        .from('user_totp')
+        .delete()
+        .eq('user_id', userId);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    setTotpSecret('');
-    return true;
-  } catch (error: any) {
-    console.error('Error disabling TOTP:', error);
-    setToastMessage(error.message || 'Failed to disable TOTP');
-    setShowToast(true);
-    return false;
-  } finally {
-    setIsLoading(false);
-  }
-};
+      setTotpSecret('');
+      setIsVerified(false);
+      return true;
+    } catch (error: any) {
+      console.error('Error disabling TOTP:', error);
+      setToastMessage(error.message || 'Failed to disable TOTP');
+      setShowToast(true);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleToggle = async (event: CustomEvent) => {
     const enabled = event.detail.checked;
     if (isLoading) return;
@@ -219,6 +222,11 @@ const TotpToggle: React.FC<TotpToggleProps> = ({
                       }}>
                         {totpSecret || 'Loading...'}
                       </p>
+                      {!isVerified && (
+                        <IonText color="warning">
+                          <p>This secret key is not yet verified. Please complete setup in your authenticator app.</p>
+                        </IonText>
+                      )}
                     </IonText>
                   </IonCol>
                   <IonCol size="auto">

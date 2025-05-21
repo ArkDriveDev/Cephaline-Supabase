@@ -185,7 +185,7 @@ const EnableMFA: React.FC = () => {
       // 2. Delete TOTP codes - enhanced version with error handling
       // 2. Delete TOTP codes - properly count deleted records
       const { error: totpError, count: totpDeletedCount } = await supabase
-        .from('totp_codes')
+        .from('user_totp')
         .delete({ count: 'exact' })  // Move count option here
         .eq('user_id', user.id);
 

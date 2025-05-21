@@ -14,7 +14,7 @@ import {
   IonIcon
 } from '@ionic/react';
 import { supabase } from '../utils/supaBaseClient';
-import * as otplib from 'otplib';
+import { TOTP } from 'otpauth';
 import { useState } from 'react';
 import { close } from 'ionicons/icons';
 
@@ -34,29 +34,25 @@ const TotpModal: React.FC<TotpModalProps> = ({
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isResending, setIsResending] = useState(false);
 
   const verifyCode = async (code: string, secret: string) => {
-    // Verify code is valid format
+    // Verify code is valid format (6 digits)
     if (code.length !== 6 || !/^\d+$/.test(code)) {
-      throw new Error('Invalid code format');
+      throw new Error('Code must be 6 digits');
     }
 
-    // Check if code was already used
-    const { data: existingCode } = await supabase
-      .from('totp_codes')
-      .select('*')
-      .eq('user_id', session.user?.id)
-      .eq('code', code)
-      .not('used_at', 'is', null)
-      .maybeSingle();
+    // Create TOTP instance with the stored secret
+    const totp = new TOTP({
+      secret: secret,
+      digits: 6,
+      period: 30,
+      algorithm: 'SHA1'
+    });
 
-    if (existingCode) {
-      throw new Error('This code was already used');
-    }
-
-    // Verify against TOTP
-    if (!otplib.authenticator.check(code, secret)) {
+    // Verify the code
+    const isValid = totp.validate({ token: code, window: 1 }) !== null;
+    
+    if (!isValid) {
       throw new Error('Invalid verification code');
     }
   };
@@ -72,58 +68,40 @@ const TotpModal: React.FC<TotpModalProps> = ({
 
     try {
       // 1. Get the user's TOTP secret
-      const { data: secretData, error: secretError } = await supabase
-        .from('user_totp_secrets')
-        .select('secret')
+      const { data: totpData, error: totpError } = await supabase
+        .from('user_totp')
+        .select('secret, is_verified')
         .eq('user_id', session.user?.id)
         .single();
 
-      if (secretError) throw secretError;
-      if (!secretData?.secret) {
-        throw new Error('TOTP not configured for this account');
+      if (totpError || !totpData?.secret) {
+        throw totpError || new Error('TOTP not configured for this account');
       }
 
-      // 2. Verify the code
-      await verifyCode(code, secretData.secret);
+      // 2. Verify the code using otpauth
+      await verifyCode(code, totpData.secret);
 
-      // 3. Record code usage
-      const { error: insertError } = await supabase
-        .from('totp_codes')
-        .insert({
-          user_id: session.user?.id,
-          code: code,
-          secret_key: secretData.secret,
-          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-          used_at: new Date().toISOString()
-        });
+      // 3. Mark TOTP as verified if it wasn't already
+      if (!totpData.is_verified) {
+        const { error: updateError } = await supabase
+          .from('user_totp')
+          .update({ is_verified: true })
+          .eq('user_id', session.user?.id);
 
-      if (insertError) throw insertError;
+        if (updateError) throw updateError;
+      }
 
-      // 4. Refresh session and complete auth
-      const { error: refreshError } = await supabase.auth.refreshSession();
+      // 4. Refresh session to update claims
+      const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError) throw refreshError;
 
+      // 5. Complete login
       onVerificationSuccess();
     } catch (err: any) {
       console.error('TOTP verification error:', err);
       setError(err.message || 'Verification failed. Please try again.');
     } finally {
       setIsVerifying(false);
-    }
-  };
-
-  const handleResendCode = async () => {
-    setIsResending(true);
-    try {
-      // In a real app, you might want to:
-      // 1. Send email/SMS with backup code
-      // 2. Generate new recovery codes
-      // 3. Or just show a message to check authenticator app
-      setError('Please check your authenticator app for a new code');
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend code');
-    } finally {
-      setIsResending(false);
     }
   };
 
@@ -198,18 +176,6 @@ const TotpModal: React.FC<TotpModalProps> = ({
                 disabled={isVerifying || code.length !== 6}
               >
                 {isVerifying ? <IonSpinner name="crescent" /> : 'Verify'}
-              </IonButton>
-            </IonCol>
-          </IonRow>
-
-          <IonRow className="ion-justify-content-center ion-margin-top">
-            <IonCol size="12" sizeMd="8" className="ion-text-center">
-              <IonButton 
-                fill="clear" 
-                onClick={handleResendCode}
-                disabled={isResending}
-              >
-                {isResending ? 'Sending...' : 'Need a new code?'}
               </IonButton>
             </IonCol>
           </IonRow>
