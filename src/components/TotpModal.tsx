@@ -12,7 +12,7 @@ import {
   IonCol,
   IonSpinner,
   IonIcon,
-  IonAlert
+  IonToast
 } from '@ionic/react';
 import { supabase } from '../utils/supaBaseClient';
 import { TOTP } from 'otpauth';
@@ -26,15 +26,16 @@ interface TotpModalProps {
   onVerificationSuccess: (session: any) => void;
 }
 
-const TotpModal: React.FC<TotpModalProps> = ({ 
-  isOpen, 
-  onDidDismiss, 
+const TotpModal: React.FC<TotpModalProps> = ({
+  isOpen,
+  onDidDismiss,
   session,
-  onVerificationSuccess 
+  onVerificationSuccess
 }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   const verifyCode = async (code: string, secret: string) => {
     if (code.length !== 6 || !/^\d+$/.test(code)) {
@@ -49,76 +50,63 @@ const TotpModal: React.FC<TotpModalProps> = ({
     });
 
     const isValid = totp.validate({ token: code, window: 1 }) !== null;
-    
+
     if (!isValid) {
       throw new Error('Invalid verification code');
     }
   };
 
- const handleVerify = async () => {
-  if (code.length !== 6) {
-    setError('Please enter a 6-digit code');
-    return;
-  }
+  const handleVerify = async () => {
+    if (code.length !== 6) {
+      setError('Please enter a 6-digit code');
+      return;
+    }
 
-  setIsVerifying(true);
-  setError('');
+    setIsVerifying(true);
+    setError('');
 
-  try {
-    const { data: totpData, error: totpError } = await supabase
-      .from('user_totp')
-      .select('secret, is_verified')
-      .eq('user_id', session.user?.id)
-      .single();
-
-    if (totpError || !totpData?.secret) throw totpError || new Error('TOTP configuration error');
-
-    await verifyCode(code, totpData.secret);
-
-    if (!totpData.is_verified) {
-      const { error: updateError } = await supabase
+    try {
+      const { data: totpData, error: totpError } = await supabase
         .from('user_totp')
-        .update({ is_verified: true })
-        .eq('user_id', session.user?.id);
-      if (updateError) throw updateError;
-    }
+        .select('secret, is_verified')
+        .eq('user_id', session.user?.id)
+        .single();
 
-    const { data: { session: newSession }, error: refreshError } = 
-      await supabase.auth.refreshSession();
-    if (refreshError) throw refreshError;
+      if (totpError || !totpData?.secret) throw totpError || new Error('TOTP configuration error');
 
-    onVerificationSuccess(newSession);
- } catch (err: any) {
-    console.error('TOTP verification error:', err);
-    
-    // Show alert before redirecting
-    await presentAlert();
-    await supabase.auth.signOut();
-    window.location.href = '/Cephaline-Supabase';
-    return;
-  } finally {
-    if (!window.location.href.endsWith('/Cephaline-Supabase')) {
-      setIsVerifying(false);
+      await verifyCode(code, totpData.secret);
+
+      if (!totpData.is_verified) {
+        const { error: updateError } = await supabase
+          .from('user_totp')
+          .update({ is_verified: true })
+          .eq('user_id', session.user?.id);
+        if (updateError) throw updateError;
+      }
+
+      const { data: { session: newSession }, error: refreshError } =
+        await supabase.auth.refreshSession();
+      if (refreshError) throw refreshError;
+
+      onVerificationSuccess(newSession);
+    } catch (err: any) {
+      setShowToast(true);
+      console.error('TOTP verification failed:', err);
+      await supabase.auth.signOut();
+      window.location.href = '/Cephaline-Supabase'; // Hard redirect
+      return;
+    } finally {
+      if (!window.location.href.endsWith('/Cephaline-Supabase')) {
+        setIsVerifying(false);
+      }
     }
-  }
-};
+  };
 
   const handleDismiss = () => {
     setCode('');
     setError('');
     onDidDismiss();
   };
-
-  const presentAlert = async () => {
-  const alert = document.createElement('ion-alert');
-  alert.header = 'Verification Failed';
-  alert.message = 'Invalid TOTP key. Please try again.';
-  alert.buttons = ['OK'];
-
-  document.body.appendChild(alert);
-  await alert.present();
-  await alert.onDidDismiss();
-};
 
   return (
     <IonModal isOpen={isOpen} onDidDismiss={handleDismiss}>
@@ -139,7 +127,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
                   Enter the 6-digit code from your authenticator app
                 </p>
               </IonText>
-              
+
               <div className="ion-text-center" style={{ margin: '20px 0' }}>
                 <IonInput
                   value={code}
@@ -179,8 +167,8 @@ const TotpModal: React.FC<TotpModalProps> = ({
 
           <IonRow className="ion-justify-content-center ion-margin-top">
             <IonCol size="12" sizeMd="8">
-              <IonButton 
-                expand="block" 
+              <IonButton
+                expand="block"
                 onClick={handleVerify}
                 disabled={isVerifying || code.length !== 6}
               >
@@ -189,6 +177,15 @@ const TotpModal: React.FC<TotpModalProps> = ({
             </IonCol>
           </IonRow>
         </IonGrid>
+
+        <IonToast
+          isOpen={showToast}
+          onDidDismiss={() => setShowToast(false)}
+          message="Invalid TOTP Code"
+          duration={1500}
+          position="top"
+          color="primary"
+        />
       </IonContent>
     </IonModal>
   );
