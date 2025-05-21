@@ -11,7 +11,8 @@ import {
   IonRow,
   IonCol,
   IonSpinner,
-  IonIcon
+  IonIcon,
+  IonAlert
 } from '@ionic/react';
 import { supabase } from '../utils/supaBaseClient';
 import { TOTP } from 'otpauth';
@@ -54,59 +55,70 @@ const TotpModal: React.FC<TotpModalProps> = ({
     }
   };
 
-  const handleVerify = async () => {
-    if (code.length !== 6) {
-      setError('Please enter a 6-digit code');
-      return;
+ const handleVerify = async () => {
+  if (code.length !== 6) {
+    setError('Please enter a 6-digit code');
+    return;
+  }
+
+  setIsVerifying(true);
+  setError('');
+
+  try {
+    const { data: totpData, error: totpError } = await supabase
+      .from('user_totp')
+      .select('secret, is_verified')
+      .eq('user_id', session.user?.id)
+      .single();
+
+    if (totpError || !totpData?.secret) throw totpError || new Error('TOTP configuration error');
+
+    await verifyCode(code, totpData.secret);
+
+    if (!totpData.is_verified) {
+      const { error: updateError } = await supabase
+        .from('user_totp')
+        .update({ is_verified: true })
+        .eq('user_id', session.user?.id);
+      if (updateError) throw updateError;
     }
 
-    setIsVerifying(true);
-    setError('');
+    const { data: { session: newSession }, error: refreshError } = 
+      await supabase.auth.refreshSession();
+    if (refreshError) throw refreshError;
 
-    try {
-      // Get the user's TOTP secret
-      const { data: totpData, error: totpError } = await supabase
-        .from('user_totp')
-        .select('secret, is_verified')
-        .eq('user_id', session.user?.id)
-        .single();
-
-      if (totpError || !totpData?.secret) {
-        throw totpError || new Error('TOTP not configured for this account');
-      }
-
-      // Verify the code
-      await verifyCode(code, totpData.secret);
-
-      // Mark TOTP as verified if needed
-      if (!totpData.is_verified) {
-        const { error: updateError } = await supabase
-          .from('user_totp')
-          .update({ is_verified: true })
-          .eq('user_id', session.user?.id);
-
-        if (updateError) throw updateError;
-      }
-
-      // Refresh the session to get updated auth factors
-      const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) throw refreshError;
-
-      console.log('TOTP verification successful, new session:', newSession);
-      onVerificationSuccess(newSession);
-    } catch (err: any) {
-      console.error('TOTP verification error:', err);
-      setError(err.message || 'Verification failed. Please try again.');
-    } finally {
+    onVerificationSuccess(newSession);
+ } catch (err: any) {
+    console.error('TOTP verification error:', err);
+    
+    // Show alert before redirecting
+    await presentAlert();
+    await supabase.auth.signOut();
+    window.location.href = '/Cephaline-Supabase';
+    return;
+  } finally {
+    if (!window.location.href.endsWith('/Cephaline-Supabase')) {
       setIsVerifying(false);
     }
-  };
+  }
+};
 
   const handleDismiss = () => {
     setCode('');
     setError('');
     onDidDismiss();
   };
+
+  const presentAlert = async () => {
+  const alert = document.createElement('ion-alert');
+  alert.header = 'Verification Failed';
+  alert.message = 'Invalid TOTP key. Please try again.';
+  alert.buttons = ['OK'];
+
+  document.body.appendChild(alert);
+  await alert.present();
+  await alert.onDidDismiss();
+};
 
   return (
     <IonModal isOpen={isOpen} onDidDismiss={handleDismiss}>
