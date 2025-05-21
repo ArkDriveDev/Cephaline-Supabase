@@ -51,31 +51,31 @@ const EnableMFA: React.FC = () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw error;
-  
+
         if (user) {
           setUser(user);
-  
+
           // Check recovery codes
           const { data: codesData, error: codesError } = await supabase
             .from('recovery_codes')
             .select('code_hash, code_status')
             .eq('user_id', user.id)
             .eq('code_status', 'active');
-  
+
           if (codesError) throw codesError;
-  
+
           // Check TOTP status
           const { count: totpCount } = await supabase
             .from('totp_codes')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', user.id)
             .is('used_at', null);
-  
+
           // Check Facial Recognition
           const { data: facialFiles } = await supabase.storage
             .from('facial-recognition')
             .list(`${user.id}/`);
-  
+
           // Check Voice Password
           const { data: voiceData } = await supabase
             .from('voice_passwords')
@@ -83,22 +83,22 @@ const EnableMFA: React.FC = () => {
             .eq('user_id', user.id)
             .is('verified_at', null)
             .single();
-  
+
           const hasTOTP = (totpCount ?? 0) > 0;
           const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
           const hasVoice = voiceData !== null;
-  
+
           if (codesData) setRecoveryCodes(codesData);
-          
+
           // MFA is enabled if we have recovery codes or active methods
           setIsEnabled((codesData && codesData.length > 0) || hasTOTP || hasFacial || hasVoice);
-          
+
           // Set active method (prioritize TOTP if multiple exist)
           setActiveMFAMethod(
             hasTOTP ? 'totp' :
-            hasFacial ? 'facial' :
-            hasVoice ? 'voice' :
-            null
+              hasFacial ? 'facial' :
+                hasVoice ? 'voice' :
+                  null
           );
         }
       } catch (error) {
@@ -171,89 +171,89 @@ const EnableMFA: React.FC = () => {
   };
 
   // Disable MFA
- // Disable MFA
-// Disable MFA
-const confirmDisableMFA = async (confirm: boolean) => {
-  setShowDisableConfirm(false);
-  if (!confirm || !user) return;
+  // Disable MFA
+  // Disable MFA
+  const confirmDisableMFA = async (confirm: boolean) => {
+    setShowDisableConfirm(false);
+    if (!confirm || !user) return;
 
-  setPendingToggle(true);
-  try {
-    // 1. Delete all recovery codes
-    await deleteAllRecoveryCodes(user.id);
-
-    // 2. Delete TOTP codes - enhanced version with error handling
-    const { error: totpError, count: totpDeletedCount } = await supabase
-      .from('totp_codes')
-      .delete()
-      .eq('user_id', user.id)
-      .select('*', { count: 'exact', head: true }); // Returns count of deleted records
-
-    if (totpError) throw totpError;
-    console.log(`Deleted ${totpDeletedCount || 0} TOTP records`);
-
-    // 3. Delete facial recognition database record
-    const { error: facialEnrollmentError } = await supabase
-      .from('user_facial_enrollments')
-      .delete()
-      .eq('user_id', user.id);
-    
-    if (facialEnrollmentError) throw facialEnrollmentError;
-
-    // 4. Delete facial recognition files from storage (optimized)
+    setPendingToggle(true);
     try {
-      const { data: files, error: listError } = await supabase.storage
-        .from('facial-recognition')
-        .list(user.id);
-      
-      if (listError) throw listError;
+      // 1. Delete all recovery codes
+      await deleteAllRecoveryCodes(user.id);
 
-      if (files && files.length > 0) {
-        const filePaths = files.map(file => `${user.id}/${file.name}`);
-        const { error: deleteError } = await supabase.storage
+      // 2. Delete TOTP codes - enhanced version with error handling
+      // 2. Delete TOTP codes - properly count deleted records
+      const { error: totpError, count: totpDeletedCount } = await supabase
+        .from('totp_codes')
+        .delete({ count: 'exact' })  // Move count option here
+        .eq('user_id', user.id);
+
+      if (totpError) throw totpError;
+      console.log(`Deleted ${totpDeletedCount || 0} TOTP records`);
+
+      // 3. Delete facial recognition database record
+      const { error: facialEnrollmentError } = await supabase
+        .from('user_facial_enrollments')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (facialEnrollmentError) throw facialEnrollmentError;
+
+      // 4. Delete facial recognition files from storage (optimized)
+      try {
+        const { data: files, error: listError } = await supabase.storage
           .from('facial-recognition')
-          .remove(filePaths);
-        
-        if (deleteError) throw deleteError;
-        console.log(`Deleted ${filePaths.length} facial recognition files`);
+          .list(user.id);
+
+        if (listError) throw listError;
+
+        if (files && files.length > 0) {
+          const filePaths = files.map(file => `${user.id}/${file.name}`);
+          const { error: deleteError } = await supabase.storage
+            .from('facial-recognition')
+            .remove(filePaths);
+
+          if (deleteError) throw deleteError;
+          console.log(`Deleted ${filePaths.length} facial recognition files`);
+        }
+      } catch (storageError) {
+        console.error('Facial storage cleanup error:', storageError);
+        // Non-critical failure - continue with other operations
       }
-    } catch (storageError) {
-      console.error('Facial storage cleanup error:', storageError);
-      // Non-critical failure - continue with other operations
+
+      // 5. Delete voice password
+      const { error: voicePasswordError } = await supabase
+        .from('user_voice_passwords')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (voicePasswordError) throw voicePasswordError;
+
+      // Update state
+      setRecoveryCodes([]);
+      setIsEnabled(false);
+      setActiveMFAMethod(null);
+      setToastMessage('All MFA methods disabled successfully!');
+      setShowToast(true);
+
+      // Optional: Log the MFA disable event
+      await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: user.id,
+          action: 'mfa_disabled',
+          details: { methods: ['totp', 'recovery_codes', 'facial', 'voice'] }
+        });
+
+    } catch (error: any) {
+      console.error('Error disabling MFA:', error);
+      setToastMessage(error.message || 'Failed to completely disable MFA. Some elements may remain active.');
+      setShowToast(true);
+    } finally {
+      setPendingToggle(false);
     }
-
-    // 5. Delete voice password
-    const { error: voicePasswordError } = await supabase
-      .from('user_voice_passwords')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (voicePasswordError) throw voicePasswordError;
-
-    // Update state
-    setRecoveryCodes([]);
-    setIsEnabled(false);
-    setActiveMFAMethod(null);
-    setToastMessage('All MFA methods disabled successfully!');
-    setShowToast(true);
-    
-    // Optional: Log the MFA disable event
-    await supabase
-      .from('audit_logs')
-      .insert({
-        user_id: user.id,
-        action: 'mfa_disabled',
-        details: { methods: ['totp', 'recovery_codes', 'facial', 'voice'] }
-      });
-
-  } catch (error: any) {
-    console.error('Error disabling MFA:', error);
-    setToastMessage(error.message || 'Failed to completely disable MFA. Some elements may remain active.');
-    setShowToast(true);
-  } finally {
-    setPendingToggle(false);
-  }
-};
+  };
   // Handle TOTP toggle changes
   const handleTotpToggleChange = async (enabled: boolean) => {
     if (enabled) {
