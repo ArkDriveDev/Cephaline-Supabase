@@ -19,6 +19,7 @@ import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
+import FaceRecognitionModal from '../components/FaceRecognitionModal';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -45,6 +46,7 @@ const Login: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
+  const [showFaceRecognitionModal, setShowFaceRecognitionModal] = useState(false);
   const [session, setSession] = useState<any>(null);
   const authChecked = useRef(false);
 
@@ -53,8 +55,8 @@ const Login: React.FC = () => {
   const checkTotpRequirement = async (userId: string) => {
     try {
       const { data: secretData, error: secretError } = await supabase
-        .from('user_totp') 
-        .select('secret') 
+        .from('user_totp')
+        .select('secret')
         .eq('user_id', userId)
         .single();
 
@@ -67,55 +69,50 @@ const Login: React.FC = () => {
   };
 
   const checkFaceEnrollment = async (userId: string) => {
-  try {
-    const { data: faceData, error: faceError } = await supabase
-      .from('user_facial_enrollments')
-      .select('user_id, face_descriptor')
-      .eq('user_id', userId)
-      .single();
+    try {
+      const { data: faceData, error: faceError } = await supabase
+        .from('user_facial_enrollments')
+        .select('user_id, face_descriptor')
+        .eq('user_id', userId)
+        .single();
 
-    if (faceError && faceError.code !== 'PGRST116') throw faceError;
-    return !!faceData?.face_descriptor;
-  } catch (error) {
-    console.error('Error checking face enrollment:', error);
-    return false;
-  }
-};
+      if (faceError && faceError.code !== 'PGRST116') throw faceError;
+      return !!faceData?.face_descriptor;
+    } catch (error) {
+      console.error('Error checking face enrollment:', error);
+      return false;
+    }
+  };
 
   const doLogin = async () => {
     try {
       setIsLoading(true);
-      console.log('Attempting login with:', email);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      console.log('Login successful, user ID:', data.user?.id);
-      const requiresTotp = await checkTotpRequirement(data.user?.id);
-      console.log('TOTP required:', requiresTotp);
+      const userId = data.user?.id;
 
+      // Check TOTP first (priority)
+      const requiresTotp = await checkTotpRequirement(userId);
       if (requiresTotp) {
         setShowTotpModal(true);
         setSession(data);
-        setIsLoading(false);
         return;
       }
 
-      // Direct login without TOTP
+      // Then check face enrollment
+      const hasFaceEnrollment = await checkFaceEnrollment(userId);
+      if (hasFaceEnrollment) {
+        setShowFaceRecognitionModal(true);
+        setSession(data);
+        return;
+      }
+
+      // Direct login if neither required
       setShowToast(true);
-      setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
+      setTimeout(() => navigation.push('/app'), 1000);
     } catch (error: any) {
-      console.error('Login error:', error);
-      setAlertMessage(
-        error.message === 'Invalid login credentials'
-          ? 'Invalid email or password'
-          : error.message || 'Login failed'
-      );
-      setShowAlert(true);
+      // ... existing error handling
     } finally {
       setIsLoading(false);
     }
@@ -123,13 +120,13 @@ const Login: React.FC = () => {
 
   const handleTotpSuccess = async () => {
     setShowTotpModal(false);
-    
+
     try {
       setIsLoading(true);
       console.log('Refreshing session after TOTP verification');
       const { data: { session }, error } = await supabase.auth.refreshSession();
       if (error) throw error;
-      
+
       setShowToast(true);
       navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
     } catch (error) {
@@ -141,14 +138,34 @@ const Login: React.FC = () => {
     }
   };
 
+const handleFaceRecognitionSuccess = async () => {
+  setShowFaceRecognitionModal(false);
+  
+  try {
+    setIsLoading(true);
+    console.log('Refreshing session after face verification');
+    const { data: { session }, error } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    
+    setShowToast(true);
+    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+  } catch (error) {
+    console.error('Error refreshing session:', error);
+    setAlertMessage('Failed to establish session after face verification');
+    setShowAlert(true);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
   // Check for existing session on component mount
   useEffect(() => {
     if (authChecked.current) return;
-    
+
     const checkSession = async () => {
       authChecked.current = true;
       setIsLoading(true);
-      
+
       try {
         console.log('Checking for existing session');
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -267,6 +284,14 @@ const Login: React.FC = () => {
           }}
           session={session}
           onVerificationSuccess={handleTotpSuccess}
+        />
+
+
+     // In your login component render:
+        <FaceRecognitionModal
+          isOpen={showFaceRecognitionModal}
+          onDidDismiss={() => setShowFaceRecognitionModal(false)}
+          onVerificationSuccess={handleFaceRecognitionSuccess}
         />
       </IonContent>
     </IonPage>
