@@ -1,7 +1,7 @@
 import * as faceapi from 'face-api.js';
 
-// Load models from public folder
 const MODEL_URL = '/models';
+const SIMILARITY_THRESHOLD = 0.6; // Adjust based on your needs
 
 export async function loadModels() {
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
@@ -29,6 +29,17 @@ export async function detectFace(image: HTMLImageElement | HTMLVideoElement | HT
   };
 }
 
-export function calculateFaceSimilarity(descriptor1: Float32Array, descriptor2: Float32Array) {
-  return faceapi.euclideanDistance(descriptor1, descriptor2);
+export function isFaceMatching(descriptor1: Float32Array, descriptor2: Float32Array) {
+  const distance = faceapi.euclideanDistance(descriptor1, descriptor2);
+  return distance <= SIMILARITY_THRESHOLD;
+}
+
+// Helper to convert Float32Array to regular array for DB storage
+export function descriptorToArray(descriptor: Float32Array): number[] {
+  return Array.from(descriptor);
+}
+
+// Helper to convert array back to Float32Array
+export function arrayToDescriptor(array: number[]): Float32Array {
+  return new Float32Array(array);
 }
