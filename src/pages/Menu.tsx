@@ -14,15 +14,17 @@ import {
   IonToolbar,
 } from '@ionic/react'
 import { homeOutline, informationOutline, logOutOutline, personCircleOutline, rocketOutline } from 'ionicons/icons';
-import { Redirect, Route } from 'react-router';
+import { Redirect, Route, useHistory } from 'react-router';
 import Home from './Home';
 import EditProfile from './EditProfile';
 import JournalPage from './JournalPage';
 import Overviewing from './Overviewing';
 import PageList from './PageList';
 import JournalPageView from './JournalPageView';
+import { supabase } from '../utils/supaBaseClient';
 
 const Menu: React.FC = () => {
+  const history = useHistory();
 
   const path = [
     { name: 'Home', url: '/Cephaline-Supabase/app/home', icon: homeOutline },
@@ -50,6 +52,18 @@ const Menu: React.FC = () => {
     color: 'white',
   };
 
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Redirect to login page after successful logout
+      history.push('/Cephaline-Supabase');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <>
       <IonMenu contentId="main-content">
@@ -67,7 +81,9 @@ const Menu: React.FC = () => {
               </IonItem>
             </IonMenuToggle>
           ))}
-          <IonButton routerLink="/Cephaline-Supabase" routerDirection="back" expand="full"
+          <IonButton 
+            onClick={handleLogout}
+            expand="full"
             style={{
               marginTop: '10%',
               width: '90vw',
@@ -75,7 +91,7 @@ const Menu: React.FC = () => {
               height: 'auto',
               padding: '1rem',
             }}>
-            <IonIcon icon={logOutOutline} slot="start"> </IonIcon>
+            <IonIcon icon={logOutOutline} slot="start"></IonIcon>
             Logout
           </IonButton>
         </IonContent>

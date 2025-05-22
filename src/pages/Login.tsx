@@ -14,7 +14,7 @@ import {
   IonCardContent,
   IonLoading,
 } from '@ionic/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
@@ -46,6 +46,7 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const authChecked = useRef(false);
 
   const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
 
@@ -68,6 +69,8 @@ const Login: React.FC = () => {
   const doLogin = async () => {
     try {
       setIsLoading(true);
+      console.log('Attempting login with:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -82,6 +85,7 @@ const Login: React.FC = () => {
       if (requiresTotp) {
         setShowTotpModal(true);
         setSession(data);
+        setIsLoading(false);
         return;
       }
 
@@ -89,6 +93,7 @@ const Login: React.FC = () => {
       setShowToast(true);
       setTimeout(() => navigation.push('/Cephaline-Supabase/app', 'forward', 'replace'), 1000);
     } catch (error: any) {
+      console.error('Login error:', error);
       setAlertMessage(
         error.message === 'Invalid login credentials'
           ? 'Invalid email or password'
@@ -100,33 +105,58 @@ const Login: React.FC = () => {
     }
   };
 
- const handleTotpSuccess = async () => {
-  setShowTotpModal(false);
-  
-  try {
-    const { data: { session }, error } = await supabase.auth.refreshSession();
-    if (error) throw error;
+  const handleTotpSuccess = async () => {
+    setShowTotpModal(false);
     
-    setShowToast(true);
-    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-  } catch (error) {
-    console.error('Error refreshing session:', error);
-    setAlertMessage('Failed to establish session after verification');
-    setShowAlert(true);
-  }
-};
+    try {
+      setIsLoading(true);
+      console.log('Refreshing session after TOTP verification');
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      
+      setShowToast(true);
+      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+      setAlertMessage('Failed to establish session after verification');
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Check for existing session on component mount
   useEffect(() => {
+    if (authChecked.current) return;
+    
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const requiresTotp = await checkTotpRequirement(session.user.id);
-        if (!requiresTotp) {
-          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+      authChecked.current = true;
+      setIsLoading(true);
+      
+      try {
+        console.log('Checking for existing session');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        if (session) {
+          console.log('Found existing session for user:', session.user.email);
+          const requiresTotp = await checkTotpRequirement(session.user.id);
+          if (!requiresTotp) {
+            navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+          }
         }
+      } catch (error) {
+        console.error('Session check error:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    checkSession();
+
+    const timer = setTimeout(() => {
+      checkSession();
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
