@@ -66,6 +66,22 @@ const Login: React.FC = () => {
     }
   };
 
+  const checkFaceEnrollment = async (userId: string) => {
+  try {
+    const { data: faceData, error: faceError } = await supabase
+      .from('user_facial_enrollments')
+      .select('user_id, face_descriptor')
+      .eq('user_id', userId)
+      .single();
+
+    if (faceError && faceError.code !== 'PGRST116') throw faceError;
+    return !!faceData?.face_descriptor;
+  } catch (error) {
+    console.error('Error checking face enrollment:', error);
+    return false;
+  }
+};
+
   const doLogin = async () => {
     try {
       setIsLoading(true);
