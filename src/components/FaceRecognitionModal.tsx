@@ -1,271 +1,176 @@
-import React, { useState, useRef } from 'react';
-import {
-  IonModal,
-  IonButton,
-  IonIcon,
-  IonText,
-  IonContent,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonCard,
-  IonCardContent,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonSpinner,
-  IonAlert
-} from '@ionic/react';
-import { cameraOutline, closeOutline } from 'ionicons/icons';
-import { supabase } from '../utils/supabaseClient';
+// components/FaceRecognitionModal.tsx
+import { IonModal, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonSpinner, IonText } from '@ionic/react';
+import Webcam from 'react-webcam';
+import { useState, useRef, useCallback } from 'react';
+import { supabase } from '../utils/supaBaseClient';
 
 interface FaceRecognitionModalProps {
   isOpen: boolean;
   onDidDismiss: () => void;
-  onVerificationSuccess: (confidence?: number) => void;
-  onFallbackToTotp?: () => void;
+  userId: string;
+  onVerificationSuccess: () => void;
 }
 
-const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
-  isOpen,
+const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({ 
+  isOpen, 
   onDidDismiss,
-  onVerificationSuccess,
-  onFallbackToTotp
+  userId,
+  onVerificationSuccess 
 }) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [verificationResult, setVerificationResult] = useState<{
-    confidence?: number;
-    landmarks?: number[][];
-  } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const webcamRef = useRef<Webcam>(null);
+  const [status, setStatus] = useState<'ready' | 'capturing' | 'verifying' | 'success' | 'error'>('ready');
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleCaptureClick = () => {
-    fileInputRef.current?.click();
+  const videoConstraints = {
+    facingMode: 'user',
+    width: 1280,
+    height: 720
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Reset previous results
-    setVerificationResult(null);
-    setError(null);
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      if (event.target?.result) {
-        const imageData = event.target.result as string;
-        setImageSrc(imageData);
-        await verifyFace(imageData);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const verifyFace = async (imageData: string) => {
+  const capture = useCallback(async () => {
     try {
-      setIsProcessing(true);
+      setStatus('capturing');
+      setErrorMessage('');
       
-      // 1. Get current user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) throw new Error('Not authenticated');
+      const imageSrc = webcamRef.current?.getScreenshot();
+      if (!imageSrc) throw new Error('Failed to capture image');
 
-      // 2. Call edge function
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-face`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            image_data: imageData.split(',')[1] // Remove data URL prefix
-          })
-        }
-      );
+      setStatus('verifying');
+      
+      // Convert to base64 (remove data URL prefix)
+      const base64Data = imageSrc.split(',')[1];
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Verification failed');
+      // Call verification endpoint
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
 
-      // 3. Handle results
-      setVerificationResult({
-        confidence: result.confidence,
-        landmarks: result.landmarks
+      if (!accessToken) throw new Error('Authentication required');
+
+      const response = await fetch('https://your-vercel-or-edge-function.url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          image_data: base64Data
+        })
       });
 
-      if (result.verified) {
-        onVerificationSuccess(result.confidence);
-      } else {
-        throw new Error(`Verification failed (${Math.round(result.confidence * 100)}% confidence)`);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
-    } finally {
-      setIsProcessing(false);
+      const result = await response.json();
+      
+      if (result.error) throw new Error(result.error);
+      if (!result.verified) throw new Error('Face did not match. Please try again.');
+
+      setStatus('success');
+      setTimeout(onVerificationSuccess, 1000); // Give user feedback before closing
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMessage(err.message || 'Verification failed');
+      console.error('Face verification error:', err);
     }
-  };
+  }, [userId, onVerificationSuccess]);
 
-  const renderFaceLandmarks = () => {
-    if (!verificationResult?.landmarks || !imageSrc) return null;
-
-    return (
-      <svg 
-        width="100%" 
-        height="100%" 
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          pointerEvents: 'none'
-        }}
-        viewBox={`0 0 ${imageSrc ? '300 300' : '0 0'}`}
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {verificationResult.landmarks.map((point, i) => (
-          <circle 
-            cx={point[0]} 
-            cy={point[1]} 
-            r="3" 
-            fill="rgba(0, 255, 0, 0.7)" 
-            key={`landmark-${i}`}
-          />
-        ))}
-      </svg>
-    );
+  const resetModal = () => {
+    setStatus('ready');
+    setErrorMessage('');
+    onDidDismiss();
   };
 
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={onDidDismiss}>
+    <IonModal isOpen={isOpen} onDidDismiss={resetModal}>
       <IonHeader>
         <IonToolbar>
           <IonTitle>Face Verification</IonTitle>
-          <IonButton slot="end" fill="clear" onClick={onDidDismiss}>
-            <IonIcon icon={closeOutline} />
-          </IonButton>
         </IonToolbar>
       </IonHeader>
-
       <IonContent className="ion-padding">
-        <input
-          type="file"
-          accept="image/*"
-          capture="user"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
-
-        {error && (
-          <IonAlert
-            isOpen={!!error}
-            onDidDismiss={() => setError(null)}
-            header="Verification Failed"
-            message={error}
-            buttons={['OK']}
-          />
-        )}
-
-        <IonCard className="ion-text-center">
-          <IonCardContent>
-            <IonGrid>
-              <IonRow className="ion-justify-content-center ion-padding">
-                <IonCol size="12">
-                  {isProcessing ? (
-                    <div className="ion-text-center">
-                      <IonSpinner name="crescent" />
-                      <IonText color="medium">
-                        <p>Verifying your face...</p>
-                      </IonText>
-                    </div>
-                  ) : imageSrc ? (
-                    <div style={{ position: 'relative' }}>
-                      <img 
-                        src={imageSrc} 
-                        alt="Captured face" 
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '300px',
-                          borderRadius: '8px',
-                          marginBottom: '16px'
-                        }} 
-                      />
-                      {renderFaceLandmarks()}
-                      <div style={{ marginTop: '16px' }}>
-                        {verificationResult?.confidence && (
-                          <IonText color={verificationResult.confidence > 0.8 ? 'success' : 'warning'}>
-                            <p>Confidence: {Math.round(verificationResult.confidence * 100)}%</p>
-                          </IonText>
-                        )}
-                        <IonButton 
-                          expand="block" 
-                          onClick={() => {
-                            setImageSrc(null);
-                            setVerificationResult(null);
-                          }}
-                          fill="outline"
-                        >
-                          Retake Photo
-                        </IonButton>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{
-                        width: '100%',
-                        height: '300px',
-                        backgroundColor: '#f4f4f4',
-                        borderRadius: '8px',
-                        marginBottom: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <IonText color="medium">
-                          <p>Face preview will appear here</p>
-                        </IonText>
-                      </div>
-                      <IonButton 
-                        expand="block" 
-                        color="primary" 
-                        onClick={handleCaptureClick}
-                      >
-                        <IonIcon icon={cameraOutline} slot="start" />
-                        Take Photo
-                      </IonButton>
-                      <p style={{ marginTop: '16px' }}>
-                        Position your face in the frame with good lighting
-                      </p>
-                    </>
-                  )}
-                </IonCol>
-                {onFallbackToTotp && (
-                  <IonCol size="12" className="ion-text-center">
-                    <IonText color="medium">
-                      <p 
-                        style={{ 
-                          cursor: 'pointer', 
-                          marginTop: '1rem',
-                          textDecoration: 'underline'
-                        }}
-                        onClick={() => {
-                          onDidDismiss();
-                          onFallbackToTotp();
-                        }}
-                      >
-                        <strong>Use verification code instead</strong>
-                      </p>
-                    </IonText>
-                  </IonCol>
+        <div style={{ 
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          textAlign: 'center'
+        }}>
+          {status === 'success' ? (
+            <div style={{ padding: '2rem' }}>
+              <IonText color="success">
+                <h2>Verification Successful!</h2>
+              </IonText>
+              <p>You will be redirected shortly...</p>
+            </div>
+          ) : (
+            <>
+              <div style={{ 
+                width: '100%',
+                maxWidth: '400px',
+                height: '300px',
+                position: 'relative',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                marginBottom: '1rem',
+                backgroundColor: '#f5f5f5'
+              }}>
+                {status !== 'ready' && status !== 'capturing' ? (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    backgroundColor: '#000'
+                  }}>
+                    <IonSpinner name="dots" color="light" />
+                  </div>
+                ) : (
+                  <Webcam
+                    ref={webcamRef}
+                    audio={false}
+                    screenshotFormat="image/jpeg"
+                    videoConstraints={videoConstraints}
+                    style={{ 
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
                 )}
-              </IonRow>
-            </IonGrid>
-          </IonCardContent>
-        </IonCard>
+              </div>
+
+              {errorMessage && (
+                <IonText color="danger" style={{ margin: '1rem 0' }}>
+                  <p>{errorMessage}</p>
+                </IonText>
+              )}
+
+              <div style={{ 
+                display: 'flex',
+                gap: '1rem',
+                marginTop: '1rem'
+              }}>
+                <IonButton 
+                  onClick={capture}
+                  disabled={status !== 'ready'}
+                >
+                  {status === 'verifying' ? (
+                    <IonSpinner name="dots" />
+                  ) : (
+                    'Verify Face'
+                  )}
+                </IonButton>
+                
+                <IonButton 
+                  fill="outline" 
+                  onClick={resetModal}
+                  disabled={status === 'verifying'}
+                >
+                  Cancel
+                </IonButton>
+              </div>
+            </>
+          )}
+        </div>
       </IonContent>
     </IonModal>
   );
