@@ -66,16 +66,21 @@ const TotpModal: React.FC<TotpModalProps> = ({
     setError('');
 
     try {
+      // Get the user's TOTP secret from database
       const { data: totpData, error: totpError } = await supabase
         .from('user_totp')
         .select('secret, is_verified')
         .eq('user_id', session.user?.id)
         .single();
 
-      if (totpError || !totpData?.secret) throw totpError || new Error('TOTP configuration error');
+      if (totpError || !totpData?.secret) {
+        throw totpError || new Error('TOTP not configured for this user');
+      }
 
+      // Verify the code against the secret
       await verifyCode(code, totpData.secret);
 
+      // Mark as verified if this is the first time
       if (!totpData.is_verified) {
         const { error: updateError } = await supabase
           .from('user_totp')
@@ -84,21 +89,19 @@ const TotpModal: React.FC<TotpModalProps> = ({
         if (updateError) throw updateError;
       }
 
+      // Refresh the session to get fresh auth data
       const { data: { session: newSession }, error: refreshError } =
         await supabase.auth.refreshSession();
       if (refreshError) throw refreshError;
 
+      // Notify parent component of successful verification
       onVerificationSuccess(newSession);
     } catch (err: any) {
+      setError(err.message || 'Verification failed');
       setShowToast(true);
       console.error('TOTP verification failed:', err);
-      await supabase.auth.signOut();
-      window.location.href = '/Cephaline-Supabase'; // Hard redirect
-      return;
     } finally {
-      if (!window.location.href.endsWith('/Cephaline-Supabase')) {
-        setIsVerifying(false);
-      }
+      setIsVerifying(false);
     }
   };
 
@@ -184,7 +187,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
           message="Invalid TOTP Code"
           duration={1500}
           position="top"
-          color="primary"
+          color="danger"
         />
       </IonContent>
     </IonModal>
