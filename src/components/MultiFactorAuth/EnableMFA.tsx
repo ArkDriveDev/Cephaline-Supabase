@@ -445,6 +445,9 @@ const EnableMFA: React.FC = () => {
               onToggleChange={handleVoiceToggleChange}
               disabled={false}
             />
+
+            <h1>................</h1>
+            <h2>.................</h2>
           </div>
         </>
       )}
