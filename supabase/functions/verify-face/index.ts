@@ -1,8 +1,22 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Human from 'https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.esm.js'
+
+// Initialize Human.js once
+const human = new Human({
+  backend: 'webgl',
+  modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models/',
+  face: {
+    enabled: true,
+    detector: { rotation: true },
+    recognition: { enabled: true }
+  }
+})
+
+await human.load() // Load models
 
 serve(async (req) => {
-  // 1. Handle CORS for web requests
+  // CORS Handling
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: {
@@ -16,16 +30,50 @@ serve(async (req) => {
   try {
     const { user_id, image_data } = await req.json()
     
-    // 2. Initialize Supabase
+    // Initialize Supabase
     const supabase = createClient(
-      Deno.env.get('VITE_SUPABASE_URL')!,
-      Deno.env.get('VITE_SUPABASE_KEY')!,
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } }
     )
 
-    // 3. Mock verification (replace with real logic)
+    // 1. Get user's enrolled face
+    const { data: enrollment, error } = await supabase
+      .from('user_facial_enrollments')
+      .select('storage_path')
+      .eq('user_id', user_id)
+      .single()
+
+    if (error || !enrollment) throw new Error('No facial enrollment found')
+
+    // 2. Download enrolled image from storage
+    const { data: enrolledImage } = await supabase.storage
+      .from('facial-recognition')
+      .download(enrollment.storage_path)
+
+    if (!enrolledImage) throw new Error('Enrolled image not found')
+
+    // 3. Process both images
+    const [enrolledTensor, inputTensor] = await Promise.all([
+      human.tf.browser.decodeImage(new Uint8Array(await enrolledImage.arrayBuffer())),
+      human.tf.browser.decodeImage(new Uint8Array(await fetch(`data:image/jpeg;base64,${image_data}`).then(r => r.arrayBuffer())))
+    ])
+
+    const [enrolledResult, inputResult] = await Promise.all([
+      human.detect(enrolledTensor),
+      human.detect(inputTensor)
+    ])
+
+    // 4. Compare faces
+    const match = human.compare(enrolledResult.face[0], inputResult.face[0])
+    const verified = match > 0.8 // Threshold
+
     return new Response(
-      JSON.stringify({ verified: true, confidence: 0.95 }), 
+      JSON.stringify({ 
+        verified,
+        confidence: match,
+        landmarks: inputResult.face[0]?.landmark // Optional for UI
+      }), 
       {
         headers: { 
           'Content-Type': 'application/json',
@@ -39,7 +87,7 @@ serve(async (req) => {
       JSON.stringify({ error: err.message }), 
       { 
         status: 400,
-        headers: { 'Access-Control-Allow-Origin': '*' } 
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
       }
     )
   }
