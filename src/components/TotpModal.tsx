@@ -12,7 +12,7 @@ import {
   IonCol,
   IonSpinner,
   IonIcon,
-  IonToast
+  IonToast,
 } from '@ionic/react';
 import { supabase } from '../utils/supaBaseClient';
 import { TOTP } from 'otpauth';
@@ -36,6 +36,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   const verifyCode = async (code: string, secret: string) => {
     if (code.length !== 6 || !/^\d+$/.test(code)) {
@@ -98,7 +99,14 @@ const TotpModal: React.FC<TotpModalProps> = ({
       onVerificationSuccess(newSession);
     } catch (err: any) {
       setError(err.message || 'Verification failed');
-      setShowToast(true);
+      if (err.message === 'Invalid verification code') {
+        setToastMessage('Invalid verification code');
+        setShowToast(true);
+        // Automatically close modal after toast duration
+        setTimeout(() => {
+          handleDismiss();
+        }, 1500);
+      }
       console.error('TOTP verification failed:', err);
     } finally {
       setIsVerifying(false);
@@ -108,7 +116,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
   const handleDismiss = () => {
     setCode('');
     setError('');
-    onDidDismiss();
+    onDidDismiss(); // Notify parent component to close modal
   };
 
   return (
@@ -184,7 +192,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
-          message="Invalid TOTP Code"
+          message={toastMessage}
           duration={1500}
           position="top"
           color="danger"

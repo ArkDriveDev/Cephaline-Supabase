@@ -90,6 +90,7 @@ const Login: React.FC = () => {
   const handleTotpSuccess = (session: any) => {
     setShowTotpModal(false);
     setShowToast(true);
+    setShowTotpModal(false);
     setTimeout(() => {
       navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
     }, 300);
