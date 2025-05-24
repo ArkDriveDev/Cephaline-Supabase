@@ -48,7 +48,6 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const detectorRef = useRef<faceDetection.FaceDetector | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  // Check for existing photo on mount
   useEffect(() => {
     if (initialEnabled) checkExistingPhoto();
     return () => cleanupCamera();
@@ -72,8 +71,8 @@ const FacialRecognitionToggle: React.FC<Props> = ({
         .createSignedUrl(enrollment.storage_path, 3600);
 
       if (!signedUrlData) throw new Error('Failed to generate signed URL');
-      
-      setPhoto(signedUrlData.signedUrl); // Fixed: Use signedUrlData.signedUrl
+
+      setPhoto(signedUrlData.signedUrl);
       setEnabled(true);
     } catch (error) {
       console.error('Photo check error:', error);
@@ -85,9 +84,9 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     if (!videoRef.current) return;
 
     try {
-      await tf.ready(); // Initialize TFJS first
-      await tf.setBackend('webgl'); // Fixed: Properly await backend setting
-      
+      await tf.ready();
+      await tf.setBackend('webgl');
+
       detectorRef.current = await faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
         {
@@ -110,13 +109,12 @@ const FacialRecognitionToggle: React.FC<Props> = ({
 
     try {
       const faces = await detectorRef.current.estimateFaces(videoRef.current);
-      
+
       if (faces.length === 1) {
         await capturePhoto();
         return;
       }
 
-      // Continue detection
       animationFrameRef.current = requestAnimationFrame(detectFaces);
     } catch (error) {
       console.error('Detection error:', error);
@@ -145,11 +143,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     try {
       setShowCameraModal(true);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user' 
-        }
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
       });
 
       if (videoRef.current) {
@@ -173,7 +167,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       if (!user) throw new Error('Not authenticated');
 
       const filePath = `${user.id}/profile_${Date.now()}.jpg`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('facial-recognition')
         .upload(filePath, blob, {
@@ -213,12 +207,12 @@ const FacialRecognitionToggle: React.FC<Props> = ({
 
   const handleToggle = async (e: CustomEvent) => {
     const isEnabled = e.detail.checked;
-    
+
     if (!isEnabled) {
       await cleanupEnrollment();
       return;
     }
-    
+
     if (!photo) await startCamera();
   };
 
@@ -313,7 +307,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       <IonModal 
         isOpen={showCameraModal}
         onDidDismiss={closeCamera}
-         style={{
+        style={{
           '--width': '100%',
           '--height': '100%',
           '--border-radius': '0',
@@ -326,20 +320,38 @@ const FacialRecognitionToggle: React.FC<Props> = ({
           </IonToolbar>
         </IonHeader>
         <IonContent>
-          <div className="camera-container">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100%',
+            position: 'relative',
+            backgroundColor: 'black'
+          }}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="camera-preview"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                borderRadius: '12px',
+                objectFit: 'contain'
+              }}
             />
             <canvas ref={canvasRef} style={{ display: 'none' }} />
-            
             {detectionActive && (
-              <div className="detection-indicator">
+              <div style={{
+                position: 'absolute',
+                bottom: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                color: 'white',
+                textAlign: 'center'
+              }}>
                 <IonSpinner name="crescent" color="light" />
-                <span>Align your face</span>
+                <div>Align your face</div>
               </div>
             )}
           </div>
