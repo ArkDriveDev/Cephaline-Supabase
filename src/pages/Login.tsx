@@ -12,13 +12,13 @@ import {
   IonToast,
   IonCard,
   IonCardContent,
-  IonIcon,
 } from '@ionic/react';
 import { useState } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
+import FaceRecognitionModal from '../components/FaceRecognitionModal';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -45,9 +45,18 @@ const Login: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
+  const [showFaceModal, setShowFaceModal] = useState(false);
   const [sessionFor2FA, setSessionFor2FA] = useState<any>(null);
+  const [userForFaceVerification, setUserForFaceVerification] = useState<any>(null);
 
   const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
+
+  const completeLogin = () => {
+    setShowToast(true);
+    setTimeout(() => {
+      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+    }, 300);
+  };
 
   const doLogin = async () => {
     try {
@@ -59,7 +68,7 @@ const Login: React.FC = () => {
 
       if (error) throw error;
 
-      // Check if user has TOTP enabled
+      // First check for TOTP enrollment
       const { data: totpData, error: totpError } = await supabase
         .from('user_totp')
         .select('id')
@@ -69,16 +78,30 @@ const Login: React.FC = () => {
       if (totpError) throw totpError;
 
       if (totpData) {
-        // User has TOTP enabled, show verification modal
+        // TOTP is enabled - require verification
         setSessionFor2FA(data);
         setShowTotpModal(true);
-      } else {
-        // No TOTP required, proceed with login
-        setShowToast(true);
-        setTimeout(() => {
-          navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-        }, 300);
+        return;
       }
+
+      // If no TOTP, check for facial recognition enrollment
+      const { data: faceData, error: faceError } = await supabase
+        .from('user_facial_enrollments')
+        .select('id')
+        .eq('user_id', data.user?.id)
+        .maybeSingle();
+
+      if (faceError) throw faceError;
+
+      if (faceData) {
+        // Facial recognition is enabled - require verification
+        setUserForFaceVerification(data.user);
+        setShowFaceModal(true);
+        return;
+      }
+
+      // No additional auth required - proceed with login
+      completeLogin();
     } catch (error: any) {
       setAlertMessage(error.message || 'Login failed');
       setShowAlert(true);
@@ -87,12 +110,14 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleTotpSuccess = (session: any) => {
+  const handleTotpSuccess = () => {
     setShowTotpModal(false);
-    setShowToast(true);
-    setTimeout(() => {
-      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
-    }, 300);
+    completeLogin();
+  };
+
+  const handleFaceVerificationSuccess = () => {
+    setShowFaceModal(false);
+    completeLogin();
   };
 
   return (
@@ -178,11 +203,20 @@ const Login: React.FC = () => {
           </IonCard>
         </div>
 
+        {/* TOTP Verification Modal */}
         <TotpModal
           isOpen={showTotpModal}
           onDidDismiss={() => setShowTotpModal(false)}
           session={sessionFor2FA}
           onVerificationSuccess={handleTotpSuccess}
+        />
+
+        {/* Facial Recognition Modal */}
+        <FaceRecognitionModal
+          isOpen={showFaceModal}
+          onDidDismiss={() => setShowFaceModal(false)}
+          userId={userForFaceVerification?.id}
+          onVerificationSuccess={handleFaceVerificationSuccess}
         />
       </IonContent>
     </IonPage>
