@@ -24,20 +24,17 @@ import './theme/variables.css';
 import Login from './pages/Login';
 import Registration from './pages/Register';
 import Menu from './pages/Menu';
-import Auth0ProviderWithNavigate from './utils/Auth0ProviderWithNavigate';
 
 setupIonicReact();
 
 const App: React.FC = () => (
   <IonApp>
     <IonReactRouter>
-      <Auth0ProviderWithNavigate>
         <IonRouterOutlet>
           <Route exact path="/Cephaline-Supabase" component={Login} />
           <Route exact path="/Cephaline-Supabase/registration" component={Registration} />
           <Route path="/Cephaline-Supabase/app" component={Menu} />
         </IonRouterOutlet>
-      </Auth0ProviderWithNavigate>
     </IonReactRouter>
   </IonApp>
 );
