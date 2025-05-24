@@ -1,79 +1,85 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import * as tf from 'https://esm.sh/@tensorflow/tfjs-node@4.5.0'
-import * as faceDetection from 'https://esm.sh/@tensorflow-models/face-detection@1.0.2'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// supabase/functions/face-detection/index.ts
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0'
 
-// Initialize once per instance
-let detector: faceDetection.FaceDetector | null = null
+// We'll use a lighter-weight face detection library that works better in Edge
+import * as faceapi from 'https://esm.sh/face-api.js@0.22.2'
 
-async function initializeDetector() {
-  await tf.setBackend('tensorflow')
-  detector = await faceDetection.createDetector(
-    faceDetection.SupportedModels.MediaPipeFaceDetector,
-    {
-      runtime: 'tfjs',
-      maxFaces: 1,
-      detectorModelUrl: 'https://storage.googleapis.com/tfjs-models/savedmodel/face_detection/blazeface/model.json'
-    }
-  )
-}
+// Global variables for cached models
+let modelsLoaded = false
+const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
 
 serve(async (req) => {
   try {
-    // Initialize detector if not already done
-    if (!detector) {
-      await initializeDetector()
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    )
+
+    // Load models if not already loaded
+    if (!modelsLoaded) {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+      modelsLoaded = true
     }
 
-    // Parse the incoming form data
+    // Parse form data
     const formData = await req.formData()
-    const imageFile = formData.get('image') as File
-    
+    const imageFile = formData.get('image') as Blob
+
     if (!imageFile) {
-      return new Response(JSON.stringify({ error: 'No image provided' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({ error: 'No image provided' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Convert image to tensor
-    const imageBuffer = new Uint8Array(await imageFile.arrayBuffer())
-    const imageTensor = tf.node.decodeImage(imageBuffer)
-    
+    // Convert image to HTMLImageElement
+    const imageBuffer = await imageFile.arrayBuffer()
+    const img = await faceapi.bufferToImage(imageBuffer)
+
     // Detect faces
-    const faces = await detector!.estimateFaces(imageTensor)
-    
-    // Clean up
-    tf.dispose(imageTensor)
+    const detections = await faceapi.detectAllFaces(
+      img,
+      new faceapi.TinyFaceDetectorOptions()
+    )
 
-    // If no face or multiple faces found
-    if (faces.length !== 1) {
-      return new Response(JSON.stringify({ 
-        valid: false,
-        faceCount: faces.length,
-        message: faces.length === 0 ? 'No face detected' : 'Multiple faces detected'
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
+    // Validate exactly one face
+    if (detections.length !== 1) {
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          faceCount: detections.length,
+          message: detections.length === 0 
+            ? 'No face detected' 
+            : 'Multiple faces detected'
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
-    // If valid face detected
-    return new Response(JSON.stringify({ 
-      valid: true,
-      faceCount: 1,
-      message: 'Face detected successfully'
-    }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({
+        valid: true,
+        faceCount: 1,
+        message: 'Face detected successfully'
+      }),
+      { headers: { 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
-    console.error('Error in face detection:', error)
-    return new Response(JSON.stringify({ 
-      error: 'Face detection failed',
-      details: error.message 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    console.error('Error:', error)
+    return new Response(
+      JSON.stringify({ 
+        error: 'Face detection failed',
+        details: error.message 
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 })
