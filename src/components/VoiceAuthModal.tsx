@@ -12,7 +12,6 @@ import {
   IonSpinner,
 } from '@ionic/react';
 import { mic, checkmarkCircle, closeCircle } from 'ionicons/icons';
-import { voiceAuthService } from '../services/voice-auth.service';
 import { supabase } from '../utils/supaBaseClient';
 
 interface VoiceAuthModalProps {
@@ -21,6 +20,48 @@ interface VoiceAuthModalProps {
   onAuthSuccess: () => void;
   userId: string;
 }
+
+// Voice authentication service
+const voiceAuthService = {
+  isBrowserSupported: () => {
+    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  },
+  
+  recognition: null as any,
+  
+  startListening: (
+    onResult: (spokenText: string) => void,
+    onError: (error: string) => void
+  ) => {
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) {
+      onError('Speech recognition not supported in this browser');
+      return;
+    }
+
+    voiceAuthService.recognition = new SpeechRecognition();
+    voiceAuthService.recognition.continuous = false;
+    voiceAuthService.recognition.interimResults = false;
+    voiceAuthService.recognition.lang = 'en-US';
+
+    voiceAuthService.recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      onResult(transcript);
+    };
+
+    voiceAuthService.recognition.onerror = (event: any) => {
+      onError(event.error);
+    };
+
+    voiceAuthService.recognition.start();
+  },
+  
+  stop: () => {
+    if (voiceAuthService.recognition) {
+      voiceAuthService.recognition.stop();
+    }
+  }
+};
 
 const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
   isOpen,
@@ -33,7 +74,7 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
   );
   const [error, setError] = useState('');
 
-  const handleListenStart = () => {
+  const handleListenStart = async () => {
     setStatus('listening');
     setError('');
 
@@ -48,10 +89,10 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
             .single();
 
           if (supabaseError || !data?.password) {
-            throw new Error('Voice password not set');
+            throw new Error('Voice password not set for this user');
           }
 
-          if (data.password.toLowerCase() === spokenText.toLowerCase()) {
+          if (data.password.toLowerCase().trim() === spokenText.toLowerCase().trim()) {
             await supabase
               .from('user_voice_passwords')
               .update({ last_used_at: new Date().toISOString() })
@@ -147,6 +188,12 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
           <div className="ion-text-center">
             <IonIcon icon={closeCircle} color="danger" size="large" />
             <p>{error || 'Authentication failed'}</p>
+            <IonButton 
+              fill="clear" 
+              onClick={() => setStatus('idle')}
+            >
+              Try Again
+            </IonButton>
           </div>
         )}
 

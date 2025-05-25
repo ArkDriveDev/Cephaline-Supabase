@@ -15,10 +15,10 @@ import {
 } from '@ionic/react';
 import { useState } from 'react';
 import { supabase } from '../utils/supaBaseClient';
-import { useAuth0 } from '@auth0/auth0-react';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
 import FaceRecognitionModal from '../components/FaceRecognitionModal';
+import VoiceAuthModal from '../components/VoiceAuthModal'; // Add this import
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -46,10 +46,10 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
   const [showFaceModal, setShowFaceModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false); // Add this state
   const [sessionFor2FA, setSessionFor2FA] = useState<any>(null);
   const [userForFaceVerification, setUserForFaceVerification] = useState<any>(null);
-
-  const { isAuthenticated, user, getAccessTokenSilently } = useAuth0();
+  const [userForVoiceVerification, setUserForVoiceVerification] = useState<any>(null); // Add this state
 
   const completeLogin = () => {
     setShowToast(true);
@@ -100,6 +100,22 @@ const Login: React.FC = () => {
         return;
       }
 
+      // If no TOTP or Face, check for voice authentication enrollment
+      const { data: voiceData, error: voiceError } = await supabase
+        .from('user_voice_passwords')
+        .select('id')
+        .eq('user_id', data.user?.id)
+        .maybeSingle();
+
+      if (voiceError) throw voiceError;
+
+      if (voiceData) {
+        // Voice authentication is enabled - require verification
+        setUserForVoiceVerification(data.user);
+        setShowVoiceModal(true);
+        return;
+      }
+
       // No additional auth required - proceed with login
       completeLogin();
     } catch (error: any) {
@@ -117,6 +133,11 @@ const Login: React.FC = () => {
 
   const handleFaceVerificationSuccess = () => {
     setShowFaceModal(false);
+    completeLogin();
+  };
+
+  const handleVoiceVerificationSuccess = () => {
+    setShowVoiceModal(false);
     completeLogin();
   };
 
@@ -217,6 +238,14 @@ const Login: React.FC = () => {
           onDidDismiss={() => setShowFaceModal(false)}
           userId={userForFaceVerification?.id}
           onVerificationSuccess={handleFaceVerificationSuccess}
+        />
+
+        {/* Voice Authentication Modal */}
+        <VoiceAuthModal
+          isOpen={showVoiceModal}
+          onDidDismiss={() => setShowVoiceModal(false)}
+          onAuthSuccess={handleVoiceVerificationSuccess}
+          userId={userForVoiceVerification?.id}
         />
       </IonContent>
     </IonPage>
