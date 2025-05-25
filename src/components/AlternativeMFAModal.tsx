@@ -19,14 +19,14 @@ import { close, personOutline, micOutline, keyOutline, timeOutline } from 'ionic
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 
-type MFAType = 'totps' | 'face' | 'voice' | 'recovery';
+type MFAType = 'totp' | 'face' | 'voice' | 'recovery';
 
 interface AlternativeMFAModalProps {
   isOpen: boolean;
   onDidDismiss: () => void;
   userId: string;
   currentMethod: MFAType;
-  onSelectOption: (option: Exclude<MFAType, 'totp'>) => void;
+  onSelectOption: (option: MFAType) => void; // Changed to allow all MFAType values
   onRecoveryCodeSuccess: () => void;
 }
 
@@ -149,7 +149,7 @@ const AlternativeMFAModal: React.FC<AlternativeMFAModalProps> = ({
     face: availableOptions.face && currentMethod !== 'face',
     voice: availableOptions.voice && currentMethod !== 'voice',
     recovery: availableOptions.recovery && currentMethod !== 'recovery',
-    totp: availableOptions.totp && currentMethod !== 'totps',
+    totp: availableOptions.totp && currentMethod !== 'totp',
   };
 
   return (
@@ -220,7 +220,7 @@ const AlternativeMFAModal: React.FC<AlternativeMFAModalProps> = ({
             ) : (
               <IonList lines="full">
                 {filteredOptions.totp && (
-                  <IonItem button onClick={() => onSelectOption('totps')}>
+                  <IonItem button onClick={() => onSelectOption('totp')}>
                     <IonAvatar slot="start">
                       <IonIcon icon={timeOutline} size="large" />
                     </IonAvatar>
