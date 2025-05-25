@@ -207,12 +207,11 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
         </div>
 
         <IonButton
-          expand="block"
-          fill="clear"
-          color="medium"
-          onClick={onDidDismiss}
-        >
-          Use another authentication method
+                fill="clear"
+                expand="block"
+                color="dark"
+              >
+               Try another way
         </IonButton>
       </IonContent>
     </IonModal>

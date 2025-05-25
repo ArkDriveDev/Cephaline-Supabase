@@ -185,6 +185,14 @@ const TotpModal: React.FC<TotpModalProps> = ({
               >
                 {isVerifying ? <IonSpinner name="crescent" /> : 'Verify'}
               </IonButton>
+
+               <IonButton
+                fill="clear"
+                expand="block"
+                color="dark"
+              >
+               Try another way
+              </IonButton>
             </IonCol>
           </IonRow>
         </IonGrid>
