@@ -13,12 +13,20 @@ import {
   IonCard,
   IonCardContent,
 } from '@ionic/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
 import FaceRecognitionModal from '../components/FaceRecognitionModal';
 import VoiceAuthModal from '../components/VoiceAuthModal';
+
+interface MFAState {
+  showTotpModal: boolean;
+  showFaceModal: boolean;
+  showVoiceModal: boolean;
+  currentUser: any;
+  sessionFor2FA: any;
+}
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -44,11 +52,14 @@ const Login: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showTotpModal, setShowTotpModal] = useState(false);
-  const [showFaceModal, setShowFaceModal] = useState(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
-  const [sessionFor2FA, setSessionFor2FA] = useState<any>(null);
-  const [authUser, setAuthUser] = useState<any>(null);
+  
+  const [mfaState, setMfaState] = useState<MFAState>({
+    showTotpModal: false,
+    showFaceModal: false,
+    showVoiceModal: false,
+    currentUser: null,
+    sessionFor2FA: null,
+  });
 
   const completeLogin = () => {
     setShowToast(true);
@@ -58,6 +69,12 @@ const Login: React.FC = () => {
   };
 
   const doLogin = async () => {
+    if (!email || !password) {
+      setAlertMessage('Please enter both email and password');
+      setShowAlert(true);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({ 
@@ -67,11 +84,7 @@ const Login: React.FC = () => {
 
       if (error) throw error;
 
-      // Store the authenticated user
-      setAuthUser(data.user);
-
-      // Check if user has any MFA factors enabled
-      await checkAuthFactors(data.user.id);
+      await checkAuthFactors(data.user);
     } catch (error: any) {
       setAlertMessage(error.message || 'Login failed');
       setShowAlert(true);
@@ -79,79 +92,133 @@ const Login: React.FC = () => {
     }
   };
 
-  const checkAuthFactors = async (userId: string) => {
-  try {
-    // Check TOTP first (most secure)
-    const { data: totpData, error: totpError } = await supabase
-      .from('user_totp')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
+  const checkAuthFactors = async (user: any) => {
+    try {
+      const userId = user.id;
+      
+      // Check TOTP first (most secure)
+      const { data: totpData } = await supabase
+        .from('user_totp')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    if (totpError) {
-      console.error('TOTP check error:', totpError);
-    } else if (totpData?.id) {
-      setSessionFor2FA({ user: authUser });
-      setShowTotpModal(true);
-      return;
+      if (totpData?.id) {
+        setMfaState({
+          ...mfaState,
+          showTotpModal: true,
+          currentUser: user,
+          sessionFor2FA: { user }
+        });
+        return;
+      }
+
+      // Check Face Recognition
+      const { data: faceData } = await supabase
+        .from('user_facial_enrollments')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (faceData?.id) {
+        setMfaState({
+          ...mfaState,
+          showFaceModal: true,
+          currentUser: user
+        });
+        return;
+      }
+
+      // Check Voice Authentication
+      const { data: voiceData } = await supabase
+        .from('user_voice_passwords')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (voiceData?.user_id) {
+        setMfaState({
+          ...mfaState,
+          showVoiceModal: true,
+          currentUser: user
+        });
+        return;
+      }
+
+      // If no MFA methods found
+      completeLogin();
+    } catch (error) {
+      console.error('Error checking MFA factors:', error);
+      completeLogin(); // Fallback to regular login
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // Check Face Recognition
-    const { data: faceData, error: faceError } = await supabase
-      .from('user_facial_enrollments')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (faceError) {
-      console.error('Face recognition check error:', faceError);
-    } else if (faceData?.id) {
-      setShowFaceModal(true);
-      return;
-    }
-
-    // Check Voice Authentication - CORRECTED QUERY
-    const { data: voiceData, error: voiceError } = await supabase
-      .from('user_voice_passwords')
-      .select('*')  // Changed from 'id' to '*' to ensure we get the record
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    console.log('Voice auth check:', { voiceData, voiceError }); // Debug log
-
-    if (voiceError) {
-      console.error('Voice authentication check error:', voiceError);
-    } else if (voiceData?.user_id) {  // Check for user_id instead of id
-      setShowVoiceModal(true);
-      return;
-    }
-
-    // If no factors found, proceed with login
-    console.log('No MFA factors found, proceeding with direct login');
-    completeLogin();
-  } catch (error) {
-    console.error('Unexpected error checking auth factors:', error);
-    // Fail open - allow login if we can't check factors
-    completeLogin();
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  // MFA Success Handlers
   const handleTotpSuccess = () => {
-    setShowTotpModal(false);
+    setMfaState({ ...mfaState, showTotpModal: false });
     completeLogin();
   };
 
   const handleFaceVerificationSuccess = () => {
-    setShowFaceModal(false);
+    setMfaState({ ...mfaState, showFaceModal: false });
     completeLogin();
   };
 
   const handleVoiceVerificationSuccess = () => {
-    setShowVoiceModal(false);
+    setMfaState({ ...mfaState, showVoiceModal: false });
     completeLogin();
   };
+
+  // Try another MFA method
+  const tryAnotherMethod = (currentMethod: string) => {
+    switch (currentMethod) {
+      case 'totp':
+        setMfaState({
+          ...mfaState,
+          showTotpModal: false,
+          showFaceModal: true
+        });
+        break;
+      case 'face':
+        setMfaState({
+          ...mfaState,
+          showFaceModal: false,
+          showVoiceModal: true
+        });
+        break;
+      case 'voice':
+        setMfaState({
+          ...mfaState,
+          showVoiceModal: false,
+          showTotpModal: true
+        });
+        break;
+      default:
+        setMfaState({
+          showTotpModal: false,
+          showFaceModal: false,
+          showVoiceModal: false,
+          currentUser: null,
+          sessionFor2FA: null
+        });
+        completeLogin();
+    }
+  };
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      setMfaState({
+        showTotpModal: false,
+        showFaceModal: false,
+        showVoiceModal: false,
+        currentUser: null,
+        sessionFor2FA: null
+      });
+    };
+  }, []);
 
   return (
     <IonPage>
@@ -234,25 +301,29 @@ const Login: React.FC = () => {
           </IonCard>
         </div>
 
+        {/* MFA Modals */}
         <TotpModal
-          isOpen={showTotpModal}
-          onDidDismiss={() => setShowTotpModal(false)}
-          session={sessionFor2FA}
+          isOpen={mfaState.showTotpModal}
+          onDidDismiss={() => setMfaState({ ...mfaState, showTotpModal: false })}
+          session={mfaState.sessionFor2FA}
           onVerificationSuccess={handleTotpSuccess}
+          onTryAnotherWay={() => tryAnotherMethod('totp')}
         />
 
         <FaceRecognitionModal
-          isOpen={showFaceModal}
-          onDidDismiss={() => setShowFaceModal(false)}
-          userId={authUser?.id}
+          isOpen={mfaState.showFaceModal}
+          onDidDismiss={() => setMfaState({ ...mfaState, showFaceModal: false })}
+          userId={mfaState.currentUser?.id}
           onVerificationSuccess={handleFaceVerificationSuccess}
+          onTryAnotherWay={() => tryAnotherMethod('face')}
         />
 
         <VoiceAuthModal
-          isOpen={showVoiceModal}
-          onDidDismiss={() => setShowVoiceModal(false)}
+          isOpen={mfaState.showVoiceModal}
+          onDidDismiss={() => setMfaState({ ...mfaState, showVoiceModal: false })}
           onAuthSuccess={handleVoiceVerificationSuccess}
-          userId={authUser?.id}
+          userId={mfaState.currentUser?.id}
+          onTryAnotherWay={() => tryAnotherMethod('voice')}
         />
       </IonContent>
     </IonPage>
