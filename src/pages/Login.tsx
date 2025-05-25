@@ -18,7 +18,7 @@ import { supabase } from '../utils/supaBaseClient';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
 import FaceRecognitionModal from '../components/FaceRecognitionModal';
-import VoiceAuthModal from '../components/VoiceAuthModal'; // Add this import
+import VoiceAuthModal from '../components/VoiceAuthModal';
 
 const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
   message,
@@ -46,10 +46,9 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
   const [showFaceModal, setShowFaceModal] = useState(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false); // Add this state
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [sessionFor2FA, setSessionFor2FA] = useState<any>(null);
-  const [userForFaceVerification, setUserForFaceVerification] = useState<any>(null);
-  const [userForVoiceVerification, setUserForVoiceVerification] = useState<any>(null); // Add this state
+  const [authUser, setAuthUser] = useState<any>(null);
 
   const completeLogin = () => {
     setShowToast(true);
@@ -68,63 +67,76 @@ const Login: React.FC = () => {
 
       if (error) throw error;
 
-      // First check for TOTP enrollment
-      const { data: totpData, error: totpError } = await supabase
-        .from('user_totp')
-        .select('id')
-        .eq('user_id', data.user?.id)
-        .maybeSingle();
+      // Store the authenticated user
+      setAuthUser(data.user);
 
-      if (totpError) throw totpError;
-
-      if (totpData) {
-        // TOTP is enabled - require verification
-        setSessionFor2FA(data);
-        setShowTotpModal(true);
-        return;
-      }
-
-      // If no TOTP, check for facial recognition enrollment
-      const { data: faceData, error: faceError } = await supabase
-        .from('user_facial_enrollments')
-        .select('id')
-        .eq('user_id', data.user?.id)
-        .maybeSingle();
-
-      if (faceError) throw faceError;
-
-      if (faceData) {
-        // Facial recognition is enabled - require verification
-        setUserForFaceVerification(data.user);
-        setShowFaceModal(true);
-        return;
-      }
-
-      // If no TOTP or Face, check for voice authentication enrollment
-      const { data: voiceData, error: voiceError } = await supabase
-        .from('user_voice_passwords')
-        .select('id')
-        .eq('user_id', data.user?.id)
-        .maybeSingle();
-
-      if (voiceError) throw voiceError;
-
-      if (voiceData) {
-        // Voice authentication is enabled - require verification
-        setUserForVoiceVerification(data.user);
-        setShowVoiceModal(true);
-        return;
-      }
-
-      // No additional auth required - proceed with login
-      completeLogin();
+      // Check if user has any MFA factors enabled
+      await checkAuthFactors(data.user.id);
     } catch (error: any) {
       setAlertMessage(error.message || 'Login failed');
       setShowAlert(true);
-    } finally {
       setIsLoading(false);
     }
   };
+
+  const checkAuthFactors = async (userId: string) => {
+  try {
+    // Check TOTP first (most secure)
+    const { data: totpData, error: totpError } = await supabase
+      .from('user_totp')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (totpError) {
+      console.error('TOTP check error:', totpError);
+    } else if (totpData?.id) {
+      setSessionFor2FA({ user: authUser });
+      setShowTotpModal(true);
+      return;
+    }
+
+    // Check Face Recognition
+    const { data: faceData, error: faceError } = await supabase
+      .from('user_facial_enrollments')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (faceError) {
+      console.error('Face recognition check error:', faceError);
+    } else if (faceData?.id) {
+      setShowFaceModal(true);
+      return;
+    }
+
+    // Check Voice Authentication - CORRECTED QUERY
+    const { data: voiceData, error: voiceError } = await supabase
+      .from('user_voice_passwords')
+      .select('*')  // Changed from 'id' to '*' to ensure we get the record
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    console.log('Voice auth check:', { voiceData, voiceError }); // Debug log
+
+    if (voiceError) {
+      console.error('Voice authentication check error:', voiceError);
+    } else if (voiceData?.user_id) {  // Check for user_id instead of id
+      setShowVoiceModal(true);
+      return;
+    }
+
+    // If no factors found, proceed with login
+    console.log('No MFA factors found, proceeding with direct login');
+    completeLogin();
+  } catch (error) {
+    console.error('Unexpected error checking auth factors:', error);
+    // Fail open - allow login if we can't check factors
+    completeLogin();
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleTotpSuccess = () => {
     setShowTotpModal(false);
@@ -150,14 +162,12 @@ const Login: React.FC = () => {
       </IonHeader>
 
       <IonContent className="ion-padding" fullscreen>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100%',
-          }}
-        >
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+        }}>
           <IonCard className="fancy-card" style={{ width: '90%', maxWidth: '400px', padding: '2rem' }}>
             <IonCardContent>
               <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>USER LOGIN</h2>
@@ -170,7 +180,7 @@ const Login: React.FC = () => {
                 value={email}
                 onIonChange={(e) => setEmail(e.detail.value!)}
                 disabled={isLoading}
-              ></IonInput>
+              />
 
               <IonInput
                 className="fancy-input"
@@ -224,7 +234,6 @@ const Login: React.FC = () => {
           </IonCard>
         </div>
 
-        {/* TOTP Verification Modal */}
         <TotpModal
           isOpen={showTotpModal}
           onDidDismiss={() => setShowTotpModal(false)}
@@ -232,20 +241,18 @@ const Login: React.FC = () => {
           onVerificationSuccess={handleTotpSuccess}
         />
 
-        {/* Facial Recognition Modal */}
         <FaceRecognitionModal
           isOpen={showFaceModal}
           onDidDismiss={() => setShowFaceModal(false)}
-          userId={userForFaceVerification?.id}
+          userId={authUser?.id}
           onVerificationSuccess={handleFaceVerificationSuccess}
         />
 
-        {/* Voice Authentication Modal */}
         <VoiceAuthModal
           isOpen={showVoiceModal}
           onDidDismiss={() => setShowVoiceModal(false)}
           onAuthSuccess={handleVoiceVerificationSuccess}
-          userId={userForVoiceVerification?.id}
+          userId={authUser?.id}
         />
       </IonContent>
     </IonPage>
