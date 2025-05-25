@@ -11,11 +11,7 @@ import {
   IonLabel,
   IonInput,
   IonText,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonLoading,
-  useIonToast
 } from '@ionic/react';
 
 interface RecoveryCodeLoginModalProps {
@@ -25,7 +21,7 @@ interface RecoveryCodeLoginModalProps {
   onBackTo2FA?: () => void; // Optional back button to return to regular 2FA
 }
 
-export const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
+const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
@@ -34,7 +30,6 @@ export const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [presentToast] = useIonToast();
 
   useEffect(() => {
     if (!isOpen) {
@@ -126,3 +121,5 @@ export const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
     </>
   );
 };
+
+export default RecoveryCodeLoginModal;
