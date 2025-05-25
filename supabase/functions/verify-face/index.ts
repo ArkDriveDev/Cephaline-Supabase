@@ -2,133 +2,161 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Human from 'https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.esm.js'
 
-// Initialize Human.js once
+// Initialize Human.js with warmup
 const human = new Human({
   backend: 'webgl',
   modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models/',
   face: {
     enabled: true,
-    detector: { rotation: true },
+    detector: { rotation: true, return: true },
     recognition: { enabled: true }
   }
 })
 
-await human.load() // Load models
+// Load and warm up models during initialization
+await human.load()
+await human.warmup()
+console.log('Human.js models ready')
 
-// Helper function to process image data
 const processImageData = (imageData: string): Uint8Array => {
   try {
-    // Handle both raw base64 and data URLs
     const base64 = imageData.startsWith('data:') 
       ? imageData.split(',')[1] 
-      : imageData;
+      : imageData
     return new Uint8Array(
       atob(base64)
         .split('')
         .map(c => c.charCodeAt(0))
-    );
-  } catch (err) {
-    throw new Error(`Invalid image data: ${err.message}`);
+  )} catch (err) {
+    throw new Error(`Invalid image data: ${err.message}`)
   }
-};
+}
 
 serve(async (req) => {
-  // CORS Handling
+  // Enhanced CORS handling
+  const allowedOrigins = [
+    'http://localhost:8100',
+    'https://arkdrivedev.github.io' // Add other origins as needed
+  ]
+  
+  const origin = req.headers.get('origin') || ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+  
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info',
+    'Access-Control-Max-Age': '86400', // 24 hours
+    'Vary': 'Origin' // Important for proper caching
+  }
+
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
+    return new Response(null, { 
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'authorization, content-type',
-      },
+        ...corsHeaders,
+        'Content-Length': '0'
+      } 
     })
   }
 
+  // Main request handler
   try {
+    // Validate content type
+    const contentType = req.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      throw new Error('Content-Type must be application/json')
+    }
+
     const { user_id, image_data } = await req.json()
     
     if (!user_id || !image_data) {
-      throw new Error('Missing required fields: user_id and image_data');
+      throw new Error('Missing required fields: user_id and image_data')
     }
 
-    // Initialize Supabase
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { 
-        global: { 
-          headers: { Authorization: req.headers.get('Authorization')! } 
-        }
-      }
-    )
+    // Initialize Supabase with error handling
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const authHeader = req.headers.get('Authorization')
 
-    // 1. Get user's enrolled face
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase configuration')
+    }
+    if (!authHeader) {
+      throw new Error('Authorization header required')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { 
+        headers: { 
+          Authorization: authHeader 
+        } 
+      }
+    })
+
+    // Get user's enrolled face with better error handling
     const { data: enrollment, error: enrollmentError } = await supabase
       .from('user_facial_enrollments')
       .select('storage_path')
       .eq('user_id', user_id)
+      .eq('is_active', true)
       .single()
 
-    if (enrollmentError || !enrollment) {
-      throw new Error('No facial enrollment found: ' + (enrollmentError?.message || ''));
-    }
+    if (enrollmentError) throw enrollmentError
+    if (!enrollment) throw new Error('No active facial enrollment found')
 
-    // 2. Download enrolled image from storage
+    // Download enrolled image with error handling
     const { data: enrolledImage, error: downloadError } = await supabase.storage
       .from('facial-recognition')
       .download(enrollment.storage_path)
 
-    if (downloadError || !enrolledImage) {
-      throw new Error('Failed to download enrolled image: ' + (downloadError?.message || ''));
+    if (downloadError) throw downloadError
+    if (!enrolledImage) throw new Error('Enrolled image download failed')
+
+    // Process images with proper resource cleanup
+    let enrolledTensor, inputTensor
+    try {
+      const [enrolledArray, inputArray] = await Promise.all([
+        new Uint8Array(await enrolledImage.arrayBuffer()),
+        processImageData(image_data)
+      ])
+
+      enrolledTensor = human.tf.browser.decodeImage(enrolledArray)
+      inputTensor = human.tf.browser.decodeImage(inputArray)
+
+      const [enrolledResult, inputResult] = await Promise.all([
+        human.detect(enrolledTensor),
+        human.detect(inputTensor)
+      ])
+
+      // Validate faces
+      if (!enrolledResult.face?.[0]) throw new Error('No face found in enrolled image')
+      if (!inputResult.face?.[0]) throw new Error('No face detected in uploaded image')
+
+      // Compare faces with dynamic threshold
+      const match = human.compare(enrolledResult.face[0], inputResult.face[0])
+      const threshold = 0.7 // Adjust based on your security needs
+      const verified = match > threshold
+
+      return new Response(
+        JSON.stringify({ 
+          verified,
+          confidence: match,
+          faceDetected: true,
+          landmarks: inputResult.face[0]?.landmark
+        }), 
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json' 
+          }
+        }
+      )
+    } finally {
+      // Ensure tensor cleanup
+      if (enrolledTensor) human.tf.dispose(enrolledTensor)
+      if (inputTensor) human.tf.dispose(inputTensor)
     }
-
-    // 3. Process both images
-    const [enrolledArray, inputArray] = await Promise.all([
-      new Uint8Array(await enrolledImage.arrayBuffer()),
-      processImageData(image_data)
-    ]);
-
-    const [enrolledTensor, inputTensor] = [
-      human.tf.browser.decodeImage(enrolledArray),
-      human.tf.browser.decodeImage(inputArray)
-    ];
-
-    const [enrolledResult, inputResult] = await Promise.all([
-      human.detect(enrolledTensor),
-      human.detect(inputTensor)
-    ]);
-
-    // Clean up tensors to avoid memory leaks
-    human.tf.dispose([enrolledTensor, inputTensor]);
-
-    // 4. Validate we found faces
-    if (!enrolledResult.face?.[0] || !inputResult.face?.[0]) {
-      throw new Error(
-        enrolledResult.face?.[0] 
-          ? 'No face detected in input image' 
-          : 'No face found in enrolled image'
-      );
-    }
-
-    // 5. Compare faces
-    const match = human.compare(enrolledResult.face[0], inputResult.face[0]);
-    const verified = match > 0.8; // Adjust threshold as needed
-
-    return new Response(
-      JSON.stringify({ 
-        verified,
-        confidence: match,
-        landmarks: inputResult.face[0]?.landmark, // Optional for UI
-        faceDetected: true
-      }), 
-      {
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*' 
-        },
-      }
-    )
-
   } catch (err) {
     return new Response(
       JSON.stringify({ 
@@ -140,8 +168,8 @@ serve(async (req) => {
       { 
         status: 400,
         headers: { 
-          'Content-Type': 'application/json', 
-          'Access-Control-Allow-Origin': '*' 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
         } 
       }
     )

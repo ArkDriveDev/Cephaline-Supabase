@@ -1,14 +1,14 @@
 // components/FaceRecognitionModal.tsx
-import { 
-  IonModal, 
-  IonContent, 
-  IonHeader, 
-  IonToolbar, 
-  IonTitle, 
-  IonButton, 
-  IonSpinner, 
+import {
+  IonModal,
+  IonContent,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButton,
+  IonSpinner,
   IonText,
-  IonIcon 
+  IonIcon
 } from '@ionic/react';
 import { cameraReverse, close } from 'ionicons/icons';
 import Webcam from 'react-webcam';
@@ -30,17 +30,17 @@ interface FaceRecognitionModalProps {
   onVerificationSuccess: () => void;
 }
 
-const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({ 
-  isOpen, 
+const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
+  isOpen,
   onDidDismiss,
   userId,
-  onVerificationSuccess 
+  onVerificationSuccess
 }) => {
   const webcamRef = useRef<Webcam>(null);
   const [status, setStatus] = useState<'ready' | 'capturing' | 'verifying' | 'success' | 'error'>('ready');
   const [errorMessage, setErrorMessage] = useState('');
   const [retryCount, setRetryCount] = useState(0);
-  const [facingMode, setFacingMode] = useState<'user'|'environment'>('user');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const videoConstraints = {
     facingMode,
@@ -52,24 +52,21 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     try {
       setStatus('capturing');
       setErrorMessage('');
-      
+
       const imageSrc = webcamRef.current?.getScreenshot();
       if (!imageSrc) throw new Error('Failed to capture image');
 
       setStatus('verifying');
-      
-      // Convert to base64 (handle both raw and data URL formats)
-      const base64Data = imageSrc.startsWith('data:image/jpeg;base64,') 
-        ? imageSrc.split(',')[1] 
+
+      const base64Data = imageSrc.startsWith('data:image/jpeg;base64,')
+        ? imageSrc.split(',')[1]
         : imageSrc;
 
-      // Get Supabase session
       const session = await supabase.auth.getSession();
       const accessToken = session.data.session?.access_token;
       if (!accessToken) throw new Error('Authentication required');
 
-      // Call verification endpoint
-      const response = await fetch('https://your-vercel-or-edge-function.url', {
+      const response = await fetch('https://dofkgpqpyxfgxwwbiifj.supabase.co/functions/v1/verify-face', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,14 +79,13 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       });
 
       const result: VerificationResponse = await response.json();
-      
+
       if (result.error) throw new Error(result.error);
-      
-      // Provide more specific feedback based on confidence
+
       if (result.confidence && result.confidence < 0.6) {
         throw new Error('Face not clear. Please try again with better lighting.');
       }
-      
+
       if (!result.verified) {
         throw new Error('Face did not match. Please try again.');
       }
@@ -131,7 +127,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
-        <div style={{ 
+        <div style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -148,7 +144,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
             </div>
           ) : (
             <>
-              <div style={{ 
+              <div style={{
                 width: '100%',
                 maxWidth: '400px',
                 height: '300px',
@@ -174,7 +170,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                     audio={false}
                     screenshotFormat="image/jpeg"
                     videoConstraints={videoConstraints}
-                    style={{ 
+                    style={{
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover'
@@ -196,7 +192,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                 </div>
               )}
 
-              <div style={{ 
+              <div style={{
                 display: 'flex',
                 gap: '1rem',
                 marginTop: '1rem'
@@ -206,7 +202,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                     Try Again
                   </IonButton>
                 ) : (
-                  <IonButton 
+                  <IonButton
                     onClick={capture}
                     disabled={status !== 'ready'}
                   >
@@ -217,23 +213,32 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                     )}
                   </IonButton>
                 )}
-                
-                <IonButton 
+
+                <IonButton
                   onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
                   fill="outline"
                   disabled={status === 'verifying'}
                 >
                   <IonIcon icon={cameraReverse} />
                 </IonButton>
-                
-                <IonButton 
-                  fill="outline" 
+
+                <IonButton
+                  fill="outline"
                   onClick={resetModal}
                   disabled={status === 'verifying'}
                 >
                   Cancel
                 </IonButton>
               </div>
+
+              {/* Simple h1 for alternative method */}
+              <IonButton
+                fill="clear"
+                expand="block"
+                color="dark"
+              >
+               Try another way
+              </IonButton>
             </>
           )}
         </div>
