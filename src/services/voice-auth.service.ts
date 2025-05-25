@@ -1,18 +1,30 @@
-export class VoiceAuthService {
+type SpeechRecognition = any;
+type SpeechRecognitionEvent = any;
+type SpeechRecognitionErrorEvent = any;
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
+class VoiceAuthService {
   private recognition: SpeechRecognition | null = null;
   private isListening = false;
-  private onResultCallback: ((password: string) => void) | null = null;
-  private onErrorCallback: ((error: string) => void) | null = null;
+  private onResult: ((text: string) => void) | null = null;
+  private onError: ((error: string) => void) | null = null;
 
   constructor() {
-    this.initializeRecognition();
+    this.initialize();
   }
 
-  private initializeRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+  private initialize() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
-      throw new Error('Speech recognition not supported in this browser');
+      console.error('Speech Recognition API not available');
+      return;
     }
 
     this.recognition = new SpeechRecognition();
@@ -21,15 +33,14 @@ export class VoiceAuthService {
     this.recognition.maxAlternatives = 1;
     this.recognition.lang = 'en-US';
 
-    this.recognition.onresult = (event) => {
-      const result = event.results[0][0];
-      this.onResultCallback?.(result.transcript.trim());
+    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript.trim();
+      this.onResult?.(transcript);
       this.stop();
     };
 
-    this.recognition.onerror = (event) => {
-      const errorEvent = event as SpeechRecognitionErrorEvent;
-      this.onErrorCallback?.(errorEvent.error);
+    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      this.onError?.(event.error);
       this.stop();
     };
 
@@ -38,59 +49,46 @@ export class VoiceAuthService {
     };
   }
 
-  startListening(
-    onResult: (password: string) => void,
+  public isBrowserSupported(): boolean {
+    return !!window.SpeechRecognition || !!window.webkitSpeechRecognition;
+  }
+
+  public startListening(
+    onResult: (text: string) => void,
     onError?: (error: string) => void
   ) {
+    if (!this.isBrowserSupported()) {
+      onError?.('Browser not supported');
+      return;
+    }
+
     if (this.isListening) return;
 
-    this.onResultCallback = onResult;
-    this.onErrorCallback = onError || null;
+    this.onResult = onResult;
+    this.onError = onError || null;
     this.isListening = true;
-    
+
     try {
       this.recognition?.start();
     } catch (error) {
-      this.onErrorCallback?.(error instanceof Error ? error.message : String(error));
+      this.onError?.(error instanceof Error ? error.message : 'Failed to start listening');
       this.stop();
     }
   }
 
-  stop() {
+  public stop() {
     if (!this.isListening) return;
-    
+
     try {
       this.recognition?.stop();
     } catch (error) {
       console.error('Error stopping recognition:', error);
     }
-    
+
     this.isListening = false;
-  }
-
-  async verifyVoicePassword(userId: string, spokenPassword: string): Promise<boolean> {
-    try {
-      const response = await fetch('/api/auth/verify-voice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          spokenPassword
-        }),
-      });
-
-      if (!response.ok) throw new Error('Verification failed');
-
-      const data = await response.json();
-      return data.verified;
-    } catch (error) {
-      console.error('Verification error:', error);
-      return false;
-    }
+    this.onResult = null;
+    this.onError = null;
   }
 }
 
-// Singleton instance
 export const voiceAuthService = new VoiceAuthService();
