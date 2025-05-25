@@ -24,13 +24,15 @@ interface TotpModalProps {
   onDidDismiss: () => void;
   session: any;
   onVerificationSuccess: (session: any) => void;
+  onTryAnotherWay: () => void;
 }
 
 const TotpModal: React.FC<TotpModalProps> = ({
   isOpen,
   onDidDismiss,
   session,
-  onVerificationSuccess
+  onVerificationSuccess,
+  onTryAnotherWay,
 }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -67,7 +69,6 @@ const TotpModal: React.FC<TotpModalProps> = ({
     setError('');
 
     try {
-      // Get the user's TOTP secret from database
       const { data: totpData, error: totpError } = await supabase
         .from('user_totp')
         .select('secret, is_verified')
@@ -78,10 +79,8 @@ const TotpModal: React.FC<TotpModalProps> = ({
         throw totpError || new Error('TOTP not configured for this user');
       }
 
-      // Verify the code against the secret
       await verifyCode(code, totpData.secret);
 
-      // Mark as verified if this is the first time
       if (!totpData.is_verified) {
         const { error: updateError } = await supabase
           .from('user_totp')
@@ -90,22 +89,16 @@ const TotpModal: React.FC<TotpModalProps> = ({
         if (updateError) throw updateError;
       }
 
-      // Refresh the session to get fresh auth data
       const { data: { session: newSession }, error: refreshError } =
         await supabase.auth.refreshSession();
       if (refreshError) throw refreshError;
 
-      // Notify parent component of successful verification
       onVerificationSuccess(newSession);
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       if (err.message === 'Invalid verification code') {
         setToastMessage('Invalid verification code');
         setShowToast(true);
-        // Automatically close modal after toast duration
-        setTimeout(() => {
-          handleDismiss();
-        }, 1500);
       }
       console.error('TOTP verification failed:', err);
     } finally {
@@ -116,7 +109,7 @@ const TotpModal: React.FC<TotpModalProps> = ({
   const handleDismiss = () => {
     setCode('');
     setError('');
-    onDidDismiss(); // Notify parent component to close modal
+    onDidDismiss();
   };
 
   return (
@@ -186,12 +179,14 @@ const TotpModal: React.FC<TotpModalProps> = ({
                 {isVerifying ? <IonSpinner name="crescent" /> : 'Verify'}
               </IonButton>
 
-               <IonButton
+              <IonButton
                 fill="clear"
                 expand="block"
                 color="dark"
+                onClick={onTryAnotherWay}
+                disabled={isVerifying}
               >
-               Try another way
+                Try another way
               </IonButton>
             </IonCol>
           </IonRow>
