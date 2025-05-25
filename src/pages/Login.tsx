@@ -12,6 +12,7 @@ import {
   IonToast,
   IonCard,
   IonCardContent,
+  IonLoading
 } from '@ionic/react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
@@ -31,29 +32,13 @@ interface MFAState {
   currentUser: any;
   sessionFor2FA: any;
   currentMethod: 'totp' | 'face' | 'voice' | 'recovery' | null;
-  availableMethods?: {
+  availableMethods: {
     totp: boolean;
     face: boolean;
     voice: boolean;
     recovery: boolean;
   };
 }
-
-const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
-  message,
-  isOpen,
-  onClose,
-}) => {
-  return (
-    <IonAlert
-      isOpen={isOpen}
-      onDidDismiss={onClose}
-      header="Notification"
-      message={message}
-      buttons={['OK']}
-    />
-  );
-};
 
 const Login: React.FC = () => {
   const navigation = useIonRouter();
@@ -63,7 +48,7 @@ const Login: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
+  
   const [mfaState, setMfaState] = useState<MFAState>({
     showTotpModal: false,
     showFaceModal: false,
@@ -73,6 +58,12 @@ const Login: React.FC = () => {
     currentUser: null,
     sessionFor2FA: null,
     currentMethod: null,
+    availableMethods: {
+      totp: false,
+      face: false,
+      voice: false,
+      recovery: true
+    }
   });
 
   const completeLogin = () => {
@@ -91,15 +82,15 @@ const Login: React.FC = () => {
 
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
       });
 
       if (error) throw error;
 
-      // Reset MFA state before checking factors
       setMfaState({
+        ...mfaState,
         showTotpModal: false,
         showFaceModal: false,
         showVoiceModal: false,
@@ -121,64 +112,54 @@ const Login: React.FC = () => {
   const checkAuthFactors = async (user: any) => {
     try {
       const userId = user.id;
+      
+      // Check all MFA methods in parallel
+      const [
+        { data: totpData },
+        { data: faceData },
+        { data: voiceData }
+      ] = await Promise.all([
+        supabase.from('user_totp').select('user_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_facial_enrollments').select('user_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_voice_passwords').select('user_id').eq('user_id', userId).maybeSingle()
+      ]);
 
-      // Check TOTP first (most secure)
-      const { data: totpData } = await supabase
-        .from('user_totp')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Update available methods
+      const availableMethods = {
+        totp: !!totpData,
+        face: !!faceData,
+        voice: !!voiceData,
+        recovery: true
+      };
 
-      if (totpData?.id) {
-        setMfaState({
-          ...mfaState,
+      setMfaState(prev => ({
+        ...prev,
+        availableMethods,
+        currentUser: user
+      }));
+
+      // Check which method to show first (priority order: totp > face > voice)
+      if (totpData) {
+        setMfaState(prev => ({
+          ...prev,
           showTotpModal: true,
-          currentUser: user,
-          sessionFor2FA: { user },
           currentMethod: 'totp'
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Check Face Recognition
-      const { data: faceData } = await supabase
-        .from('user_facial_enrollments')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (faceData?.id) {
-        setMfaState({
-          ...mfaState,
+        }));
+      } else if (faceData) {
+        setMfaState(prev => ({
+          ...prev,
           showFaceModal: true,
-          currentUser: user,
           currentMethod: 'face'
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Check Voice Authentication
-      const { data: voiceData } = await supabase
-        .from('user_voice_passwords')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (voiceData?.user_id) {
-        setMfaState({
-          ...mfaState,
+        }));
+      } else if (voiceData) {
+        setMfaState(prev => ({
+          ...prev,
           showVoiceModal: true,
-          currentUser: user,
           currentMethod: 'voice'
-        });
-        setIsLoading(false);
-        return;
+        }));
+      } else {
+        completeLogin();
       }
-
-      // If no MFA methods found
-      completeLogin();
     } catch (error) {
       console.error('Error checking MFA factors:', error);
       completeLogin(); // Fallback to regular login
@@ -189,100 +170,47 @@ const Login: React.FC = () => {
 
   // MFA Success Handlers
   const handleTotpSuccess = () => {
-    setMfaState({ ...mfaState, showTotpModal: false });
+    setMfaState(prev => ({ ...prev, showTotpModal: false }));
     completeLogin();
   };
 
   const handleFaceVerificationSuccess = () => {
-    setMfaState({ ...mfaState, showFaceModal: false });
+    setMfaState(prev => ({ ...prev, showFaceModal: false }));
     completeLogin();
   };
 
   const handleVoiceVerificationSuccess = () => {
-    setMfaState({ ...mfaState, showVoiceModal: false });
+    setMfaState(prev => ({ ...prev, showVoiceModal: false }));
     completeLogin();
   };
 
   const handleRecoveryCodeSuccess = () => {
-    setMfaState({ ...mfaState, showRecoveryModal: false });
+    setMfaState(prev => ({ ...prev, showRecoveryModal: false }));
     completeLogin();
   };
 
-  // Show action sheet for alternative methods
-  const showAlternativeMethods = async () => {
-    try {
-      const userId = mfaState.currentUser?.id;
-      if (!userId) return;
-
-      // Check which methods are available
-      const [
-        { data: totpData },
-        { data: faceData },
-        { data: voiceData }
-      ] = await Promise.all([
-        supabase.from('user_totp').select('id').eq('user_id', userId).maybeSingle(),
-        supabase.from('user_facial_enrollments').select('id').eq('user_id', userId).maybeSingle(),
-        supabase.from('user_voice_passwords').select('id').eq('user_id', userId).maybeSingle()
-      ]);
-
-      setMfaState({
-        ...mfaState,
-        showTotpModal: false,
-        showFaceModal: false,
-        showVoiceModal: false,
-        showRecoveryModal: false,
-        showActionSheet: true,
-        availableMethods: {
-          totp: !!totpData?.id,
-          face: !!faceData?.id,
-          voice: !!voiceData?.id,
-          recovery: true // Always show recovery as an option
-        }
-      });
-    } catch (error) {
-      console.error('Error checking alternative methods:', error);
-      // Fallback to showing all methods
-      setMfaState({
-        ...mfaState,
-        showActionSheet: true,
-        availableMethods: {
-          totp: true,
-          face: true,
-          voice: true,
-          recovery: true
-        }
-      });
-    }
+  const showAlternativeMethods = () => {
+    setMfaState(prev => ({
+      ...prev,
+      showTotpModal: false,
+      showFaceModal: false,
+      showVoiceModal: false,
+      showRecoveryModal: false,
+      showActionSheet: true
+    }));
   };
 
-  // Handle selection from action sheet
   const handleSelectAlternativeMethod = (method: 'totp' | 'face' | 'voice' | 'recovery') => {
-    setMfaState({
-      ...mfaState,
+    setMfaState(prev => ({
+      ...prev,
       showActionSheet: false,
       showTotpModal: method === 'totp',
       showFaceModal: method === 'face',
       showVoiceModal: method === 'voice',
       showRecoveryModal: method === 'recovery',
       currentMethod: method
-    });
+    }));
   };
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      setMfaState({
-        showTotpModal: false,
-        showFaceModal: false,
-        showVoiceModal: false,
-        showRecoveryModal: false,
-        showActionSheet: false,
-        currentUser: null,
-        sessionFor2FA: null,
-        currentMethod: null
-      });
-    };
-  }, []);
 
   return (
     <IonPage>
@@ -368,7 +296,7 @@ const Login: React.FC = () => {
         {/* MFA Modals */}
         <TotpModal
           isOpen={mfaState.showTotpModal}
-          onDidDismiss={() => setMfaState({ ...mfaState, showTotpModal: false })}
+          onDidDismiss={() => setMfaState(prev => ({ ...prev, showTotpModal: false }))}
           session={mfaState.sessionFor2FA}
           onVerificationSuccess={handleTotpSuccess}
           onTryAnotherWay={showAlternativeMethods}
@@ -376,7 +304,7 @@ const Login: React.FC = () => {
 
         <FaceRecognitionModal
           isOpen={mfaState.showFaceModal}
-          onDidDismiss={() => setMfaState({ ...mfaState, showFaceModal: false })}
+          onDidDismiss={() => setMfaState(prev => ({ ...prev, showFaceModal: false }))}
           userId={mfaState.currentUser?.id}
           onVerificationSuccess={handleFaceVerificationSuccess}
           onTryAnotherWay={showAlternativeMethods}
@@ -384,7 +312,7 @@ const Login: React.FC = () => {
 
         <VoiceAuthModal
           isOpen={mfaState.showVoiceModal}
-          onDidDismiss={() => setMfaState({ ...mfaState, showVoiceModal: false })}
+          onDidDismiss={() => setMfaState(prev => ({ ...prev, showVoiceModal: false }))}
           onAuthSuccess={handleVoiceVerificationSuccess}
           userId={mfaState.currentUser?.id}
           onTryAnotherWay={showAlternativeMethods}
@@ -392,9 +320,8 @@ const Login: React.FC = () => {
 
         <RecoveryCodeLoginModal
           isOpen={mfaState.showRecoveryModal}
-          onClose={() => setMfaState({ ...mfaState, showRecoveryModal: false })}
+          onClose={() => setMfaState(prev => ({ ...prev, showRecoveryModal: false }))}
           onSubmit={async (code) => {
-            // Implement recovery code verification logic
             const { error } = await supabase.rpc('verify_recovery_code', {
               user_id: mfaState.currentUser?.id,
               code: code
@@ -404,21 +331,33 @@ const Login: React.FC = () => {
           onTryAnotherWay={showAlternativeMethods}
         />
 
-      // In your Login component's JSX:
         <MfaActionSheet
           isOpen={mfaState.showActionSheet}
-          onDidDismiss={() => setMfaState({ ...mfaState, showActionSheet: false })}
+          onDidDismiss={() => setMfaState(prev => ({ ...prev, showActionSheet: false }))}
           currentMethod={mfaState.currentMethod}
-          availableMethods={mfaState.availableMethods || {
-            totp: false,
-            face: false,
-            voice: false,
-            recovery: true // Always show recovery as an option
-          }}
+          availableMethods={mfaState.availableMethods}
           onSelectOption={handleSelectAlternativeMethod}
         />
+
+        <IonLoading isOpen={isLoading} message="Authenticating..." />
       </IonContent>
     </IonPage>
+  );
+};
+
+const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
+  message,
+  isOpen,
+  onClose,
+}) => {
+  return (
+    <IonAlert
+      isOpen={isOpen}
+      onDidDismiss={onClose}
+      header="Notification"
+      message={message}
+      buttons={['OK']}
+    />
   );
 };
 
