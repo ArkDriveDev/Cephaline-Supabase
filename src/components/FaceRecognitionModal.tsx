@@ -1,4 +1,3 @@
-// components/FaceRecognitionModal.tsx
 import {
   IonModal,
   IonContent,
@@ -28,13 +27,15 @@ interface FaceRecognitionModalProps {
   onDidDismiss: () => void;
   userId: string;
   onVerificationSuccess: () => void;
+  onTryAnotherWay: () => void;
 }
 
 const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
   isOpen,
   onDidDismiss,
   userId,
-  onVerificationSuccess
+  onVerificationSuccess,
+  onTryAnotherWay,
 }) => {
   const webcamRef = useRef<Webcam>(null);
   const [status, setStatus] = useState<'ready' | 'capturing' | 'verifying' | 'success' | 'error'>('ready');
@@ -58,9 +59,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
 
       setStatus('verifying');
 
-      const base64Data = imageSrc.startsWith('data:image/jpeg;base64,')
-        ? imageSrc.split(',')[1]
-        : imageSrc;
+      const base64Data = imageSrc.split(',')[1];
 
       const session = await supabase.auth.getSession();
       const accessToken = session.data.session?.access_token;
@@ -231,13 +230,14 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                 </IonButton>
               </div>
 
-              {/* Simple h1 for alternative method */}
               <IonButton
                 fill="clear"
                 expand="block"
                 color="dark"
+                onClick={onTryAnotherWay}
+                disabled={status === 'verifying'}
               >
-               Try another way
+                Try another way
               </IonButton>
             </>
           )}
