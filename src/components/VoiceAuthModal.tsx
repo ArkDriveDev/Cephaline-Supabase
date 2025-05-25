@@ -7,11 +7,10 @@ import {
   IonContent,
   IonText,
   IonButton,
-  IonFooter,
   IonIcon,
   IonSpinner,
 } from '@ionic/react';
-import { mic, checkmarkCircle, closeCircle } from 'ionicons/icons';
+import { mic, checkmarkCircle, closeCircle, close } from 'ionicons/icons';
 import { supabase } from '../utils/supaBaseClient';
 
 interface VoiceAuthModalProps {
@@ -19,6 +18,7 @@ interface VoiceAuthModalProps {
   onDidDismiss: () => void;
   onAuthSuccess: () => void;
   userId: string;
+  onTryAnotherWay: () => void;
 }
 
 const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
@@ -26,19 +26,18 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
   onDidDismiss,
   onAuthSuccess,
   userId,
+  onTryAnotherWay,
 }) => {
-  const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'success' | 'error' | 'unsupported'>(
-    'idle'
-  );
+  const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'success' | 'error' | 'unsupported'>('idle');
   const [error, setError] = useState('');
   const [recognition, setRecognition] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const isBrowserSupported = () => {
     return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   };
 
   useEffect(() => {
-    // Check browser support when component mounts
     if (!isBrowserSupported()) {
       setStatus('unsupported');
     }
@@ -82,9 +81,7 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
           throw new Error('Voice authentication not set up');
         }
 
-        // Simple comparison - you might want to add more sophisticated matching
         if (data.password.toLowerCase().trim() === spokenText.toLowerCase().trim()) {
-          // Update last used timestamp
           await supabase
             .from('user_voice_passwords')
             .update({ last_used_at: new Date().toISOString() })
@@ -116,12 +113,25 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
     setStatus('idle');
   };
 
+  const handleRetry = () => {
+    if (retryCount < 2) {
+      setRetryCount(prev => prev + 1);
+      setStatus('idle');
+      setError('');
+    } else {
+      onDidDismiss();
+    }
+  };
+
   if (status === 'unsupported') {
     return (
       <IonModal isOpen={isOpen} onDidDismiss={onDidDismiss}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Voice Authentication</IonTitle>
+            <IonButton slot="end" fill="clear" onClick={onDidDismiss}>
+              <IonIcon icon={close} />
+            </IonButton>
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding ion-text-center">
@@ -143,76 +153,95 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
       <IonHeader>
         <IonToolbar>
           <IonTitle>Voice Authentication</IonTitle>
+          <IonButton slot="end" fill="clear" onClick={onDidDismiss}>
+            <IonIcon icon={close} />
+          </IonButton>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding ion-text-center">
-        {status === 'idle' && (
-          <>
-            <IonIcon icon={mic} size="large" color="primary" />
+        {status === 'success' ? (
+          <div style={{ padding: '2rem' }}>
+            <IonIcon icon={checkmarkCircle} color="success" size="large" />
             <IonText>
-              <p>Click the button and say your voice passphrase</p>
+              <h3>Verification Successful!</h3>
+              <p>You will be redirected shortly...</p>
             </IonText>
+          </div>
+        ) : (
+          <>
+            {status === 'idle' && (
+              <>
+                <IonIcon icon={mic} size="large" color="primary" />
+                <IonText>
+                  <p>Click the button and say your voice passphrase</p>
+                </IonText>
+              </>
+            )}
+
+            {status === 'listening' && (
+              <div className="ion-text-center">
+                <IonSpinner name="circles" color="primary" />
+                <p>Listening... Speak now</p>
+              </div>
+            )}
+
+            {status === 'processing' && (
+              <div className="ion-text-center">
+                <IonSpinner name="dots" color="primary" />
+                <p>Verifying your voice...</p>
+              </div>
+            )}
+
+            {status === 'error' && (
+              <div className="ion-text-center">
+                <IonIcon icon={closeCircle} color="danger" size="large" />
+                <p>{error || 'Verification failed'}</p>
+                {retryCount < 2 && (
+                  <p>{2 - retryCount} attempts remaining</p>
+                )}
+              </div>
+            )}
+
+            <div style={{ margin: '2rem 0' }}>
+              {status === 'error' ? (
+                <IonButton expand="block" onClick={handleRetry}>
+                  Try Again
+                </IonButton>
+              ) : (
+                <IonButton
+                  expand="block"
+                  onClick={handleListenStart}
+                  disabled={status === 'listening' || status === 'processing'}
+                >
+                  <IonIcon slot="start" icon={mic} />
+                  {status === 'listening' ? 'Listening...' : 'Start Voice Authentication'}
+                </IonButton>
+              )}
+
+              {(status === 'listening' || status === 'processing') && (
+                <IonButton
+                  expand="block"
+                  fill="clear"
+                  color="medium"
+                  onClick={handleStopListening}
+                >
+                  Cancel
+                </IonButton>
+              )}
+            </div>
+
+            <IonButton
+              fill="clear"
+              expand="block"
+              color="dark"
+              onClick={onTryAnotherWay}
+              disabled={status === 'listening' || status === 'processing'}
+            >
+              Try another way
+            </IonButton>
           </>
         )}
-
-        {status === 'listening' && (
-          <div className="ion-text-center">
-            <IonSpinner name="circles" color="primary" />
-            <p>Listening... Speak now</p>
-          </div>
-        )}
-
-        {status === 'processing' && (
-          <div className="ion-text-center">
-            <IonSpinner name="dots" color="primary" />
-            <p>Verifying your voice...</p>
-          </div>
-        )}
-
-        {status === 'success' && (
-          <div className="ion-text-center">
-            <IonIcon icon={checkmarkCircle} color="success" size="large" />
-            <p>Voice verified successfully!</p>
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div className="ion-text-center">
-            <IonIcon icon={closeCircle} color="danger" size="large" />
-            <p>{error || 'Verification failed'}</p>
-          </div>
-        )}
-
-        <div style={{ margin: '2rem 0' }}>
-          <IonButton
-            expand="block"
-            onClick={handleListenStart}
-            disabled={status === 'listening' || status === 'processing'}
-          >
-            <IonIcon slot="start" icon={mic} />
-            {status === 'listening' ? 'Listening...' : 'Start Voice Authentication'}
-          </IonButton>
-
-          {(status === 'listening' || status === 'processing') && (
-            <IonButton
-              expand="block"
-              fill="clear"
-              color="medium"
-              onClick={handleStopListening}
-            >
-              Cancel
-            </IonButton>
-          )}
-        </div>
-
-        <IonButton
-                fill="clear"
-                expand="block"
-                color="dark"
-              >
-               Try another way
-        </IonButton>
       </IonContent>
     </IonModal>
   );
