@@ -75,7 +75,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
   };
 
   const handleAddPage = () => {
-    router.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
+    router.push(`/app/JournalPage/${journalId}`);
   };
 
   const handleOpenSettings = async () => {
@@ -200,7 +200,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       
       // Navigate after a brief delay
       setTimeout(() => {
-        router.push('/Cephaline-Supabase/app/journals');
+        router.push('/app/journals');
       }, 1000);
       
     } catch (error) {
@@ -208,7 +208,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       setToastMessage('Failed to delete journal. Please try again.');
       setShowToast(true);
     } finally {
-      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+      navigation.push('/app', 'forward', 'replace');
     }
   };
 
