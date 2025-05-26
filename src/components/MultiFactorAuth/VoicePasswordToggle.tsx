@@ -83,7 +83,9 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!voicePassword.trim()) {
+    const upperCasePassword = voicePassword.trim().toUpperCase();
+    
+    if (!upperCasePassword) {
       setToastMessage('Please enter a voice password');
       setToastColor('warning');
       setShowToast(true);
@@ -100,7 +102,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
         .from('user_voice_passwords')
         .upsert({
           user_id: user.id,
-          password: voicePassword
+          password: upperCasePassword
         }, {
           onConflict: 'user_id'
         });
@@ -109,6 +111,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
       setToastMessage('Voice password saved successfully');
       setToastColor('success');
+      setVoicePassword(upperCasePassword);
       setEnabled(true);
       setHasExistingPassword(true);
       onToggleChange(true);
@@ -198,7 +201,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
                   label="Enter voice password"
                   labelPlacement="floating"
                   value={voicePassword}
-                  onIonChange={(e) => setVoicePassword(e.detail.value!)}
+                  onIonChange={(e) => setVoicePassword(e.detail.value!.toUpperCase())}
                   disabled={isProcessing || disabled}
                   type="password"
                 />
