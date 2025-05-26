@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/verify-face.ts": {
+      "runtime": "edge"
+    }
+  }
+}
