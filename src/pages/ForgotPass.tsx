@@ -13,7 +13,7 @@ import favicons from '../images/favicon.png';
 import { useState } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 
-const ForgotPassword: React.FC = () => {
+const ForgotPass: React.FC = () => {
     const navigation = useIonRouter();
     const [email, setEmail] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
@@ -195,4 +195,4 @@ const ForgotPassword: React.FC = () => {
     );
 };
 
-export default ForgotPassword;
+export default ForgotPass;

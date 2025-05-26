@@ -25,7 +25,7 @@ import Login from './pages/Login';
 import Registration from './pages/Register';
 import ChangePass from './pages/Changepass';
 import Menu from './pages/Menu';
-import ForgotPassword from './pages/Forgotpassword';
+import ForgotPass from './pages/ForgotPass';
 
 
 
@@ -37,7 +37,7 @@ const App: React.FC = () => (
         <IonRouterOutlet>
           <Route exact path="/" component={Login} />
           <Route exact path="/registration" component={Registration} />
-          <Route exact path="/forgotpassword" component={ForgotPassword} />
+          <Route exact path="/forgotpass" component={ForgotPass} />
           <Route exact path="/changepassword" component={ChangePass} />
           <Route path="/app" component={Menu} />
         </IonRouterOutlet>
