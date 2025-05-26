@@ -279,6 +279,7 @@ const Login: React.FC = () => {
               >
                 Don't have an account? Register here
               </IonButton>
+
               <IonButton
                 routerLink="/Cephaline-Supabase/ForgotPassword"
                 expand="full"
@@ -293,6 +294,7 @@ const Login: React.FC = () => {
               >
                 Forgot Password?
               </IonButton>
+
               <AlertBox message={alertMessage} isOpen={showAlert} onClose={() => setShowAlert(false)} />
               <IonToast
                 isOpen={showToast}

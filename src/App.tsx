@@ -37,7 +37,7 @@ const App: React.FC = () => (
           <Route exact path="/Cephaline-Supabase" component={Login} />
           <Route exact path="/Cephaline-Supabase/registration" component={Registration} />
           <Route exact path="/Cephaline-Supabase/forgotpassword" component={ForgotPassword} />
-          <Route exact path="/Cephaline-Supabase/changepassword" component={ChangePass} />
+      <Route exact path="/Cephaline-Supabase/changepassword" component={ChangePass} />
           <Route path="/Cephaline-Supabase/app" component={Menu} />
         </IonRouterOutlet>
     </IonReactRouter>
