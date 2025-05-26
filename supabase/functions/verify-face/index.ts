@@ -35,8 +35,8 @@ const processImageData = (imageData: string): Uint8Array => {
 serve(async (req) => {
   // Enhanced CORS handling
   const allowedOrigins = [
-    'https://cephaline-supabase-git-vercel1-arkyroels-projects.vercel.app/',
-    'https://cephaline-supabase-lsrwver7l-arkyroels-projects.vercel.app/' // Add other origins as needed
+    'https://cephaline-supabase-git-vercel1-arkyroels-projects.vercel.app',
+    'https://cephaline-supabase-lsrwver7l-arkyroels-projects.vercel.app' // Add other origins as needed
   ]
   
   const origin = req.headers.get('origin') || ''
