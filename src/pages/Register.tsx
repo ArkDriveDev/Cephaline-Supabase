@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonButton,
   IonContent,
@@ -14,6 +14,7 @@ import {
   IonCardSubtitle,
   IonCardTitle,
   IonAlert,
+  IonProgressBar
 } from '@ionic/react';
 import { supabase } from '../utils/supaBaseClient';
 import bcrypt from 'bcryptjs';
@@ -46,6 +47,40 @@ const Register: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [showAlert, setShowAlert] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState({
+    value: 0,
+    label: '',
+    color: ''
+  });
+
+  useEffect(() => {
+    if (password) {
+      const strength = calculatePasswordStrength(password);
+      setPasswordStrength(strength);
+    } else {
+      setPasswordStrength({
+        value: 0,
+        label: '',
+        color: ''
+      });
+    }
+  }, [password]);
+
+  const calculatePasswordStrength = (password: string) => {
+    let strength = 0;
+    
+    if (password.length >= 8) strength += 1;
+    if (password.length >= 12) strength += 1;
+    if (/[A-Z]/.test(password)) strength += 1;
+    if (/[a-z]/.test(password)) strength += 1;
+    if (/[0-9]/.test(password)) strength += 1;
+    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+    
+    if (strength <= 2) return { value: 0.25, label: 'Very Weak', color: 'danger' };
+    if (strength <= 4) return { value: 0.5, label: 'Weak', color: 'warning' };
+    if (strength <= 6) return { value: 0.75, label: 'Strong', color: 'success' };
+    return { value: 1, label: 'Very Strong', color: 'primary' };
+  };
 
   const handleOpenVerificationModal = () => {
     if (!email.endsWith('@nbsc.edu.ph')) {
@@ -56,6 +91,12 @@ const Register: React.FC = () => {
 
     if (password !== confirmPassword) {
       setAlertMessage('Passwords do not match.');
+      setShowAlert(true);
+      return;
+    }
+
+    if (password.length < 8) {
+      setAlertMessage('Password must be at least 8 characters.');
       setShowAlert(true);
       return;
     }
@@ -123,22 +164,22 @@ const Register: React.FC = () => {
           justifyContent: 'center',
           alignItems: 'center',
           backgroundColor: '#121212',
-          height: '100vh', // Ensures the content takes up full screen height
+          height: '100vh',
         }}
       >
         <IonCard
           style={{
-            background: '#000',
+            background: '#1e1e1e',
             width: '100%',
             maxWidth: '500px',
             padding: '20px',
             borderRadius: '12px',
             boxShadow: '0 4px 10px rgba(0,0,0,0.6)',
-            margin: 'auto', // Centers the card horizontally
+            margin: 'auto',
           }}
         >
           <IonCardContent>
-            <h1 style={{ color: 'white', marginBottom: '20px' }}>Create your account</h1>
+            <h1 style={{ color: 'white', marginBottom: '20px', textAlign: 'center' }}>Create your account</h1>
 
             <IonInput
               label="Username"
@@ -192,6 +233,21 @@ const Register: React.FC = () => {
             >
               <IonInputPasswordToggle slot="end" />
             </IonInput>
+
+            {password && (
+              <div style={{ width: '100%', marginTop: '8px' }}>
+                <IonProgressBar 
+                  value={passwordStrength.value} 
+                  color={passwordStrength.color}
+                  style={{ height: '4px' }}
+                />
+                <IonText color={passwordStrength.color} style={{ fontSize: '12px' }}>
+                  {passwordStrength.label}
+                </IonText>
+              </div>
+            )}
+
+
             <IonInput
               label="Confirm Password"
               labelPlacement="stacked"
@@ -204,6 +260,29 @@ const Register: React.FC = () => {
             >
               <IonInputPasswordToggle slot="end" />
             </IonInput>
+            
+            <div style={{ 
+              width: '100%', 
+              color: '#a1a1aa',
+              fontSize: '12px',
+              margin: '8px 0'
+            }}>
+              <p>Password should contain:</p>
+              <ul style={{ paddingLeft: '20px', margin: '8px 0 0 0' }}>
+                <li style={{ color: password.length >= 8 ? '#3880ff' : '#a1a1aa' }}>
+                  At least 8 characters
+                </li>
+                <li style={{ color: /[A-Z]/.test(password) ? '#3880ff' : '#a1a1aa' }}>
+                  One uppercase letter
+                </li>
+                <li style={{ color: /[0-9]/.test(password) ? '#3880ff' : '#a1a1aa' }}>
+                  One number
+                </li>
+                <li style={{ color: /[^A-Za-z0-9]/.test(password) ? '#3880ff' : '#a1a1aa' }}>
+                  One special character
+                </li>
+              </ul>
+            </div>
 
             <IonButton
               onClick={handleOpenVerificationModal}
@@ -228,18 +307,18 @@ const Register: React.FC = () => {
             {/* Confirmation Modal */}
             <IonModal isOpen={showVerificationModal} onDidDismiss={() => setShowVerificationModal(false)}>
               <IonContent className="ion-padding">
-                <IonCard className="ion-padding" style={{ marginTop: '25%' }}>
+                <IonCard className="ion-padding" style={{ marginTop: '25%', background: '#1e1e1e' }}>
                   <IonCardHeader>
-                    <IonCardTitle>User Registration Details</IonCardTitle>
-                    <hr />
-                    <IonCardSubtitle>Username</IonCardSubtitle>
-                    <IonCardTitle>{username}</IonCardTitle>
+                    <IonCardTitle style={{ color: 'white' }}>User Registration Details</IonCardTitle>
+                    <hr style={{ borderColor: '#333' }} />
+                    <IonCardSubtitle style={{ color: '#a1a1aa' }}>Username</IonCardSubtitle>
+                    <IonCardTitle style={{ color: 'white' }}>{username}</IonCardTitle>
 
-                    <IonCardSubtitle>Email</IonCardSubtitle>
-                    <IonCardTitle>{email}</IonCardTitle>
+                    <IonCardSubtitle style={{ color: '#a1a1aa' }}>Email</IonCardSubtitle>
+                    <IonCardTitle style={{ color: 'white' }}>{email}</IonCardTitle>
 
-                    <IonCardSubtitle>Name</IonCardSubtitle>
-                    <IonCardTitle>
+                    <IonCardSubtitle style={{ color: '#a1a1aa' }}>Name</IonCardSubtitle>
+                    <IonCardTitle style={{ color: 'white' }}>
                       {firstName} {lastName}
                     </IonCardTitle>
                   </IonCardHeader>
@@ -267,10 +346,11 @@ const Register: React.FC = () => {
                   alignItems: 'center',
                   height: '100vh',
                   textAlign: 'center',
+                  background: '#1e1e1e'
                 }}
               >
-                <IonTitle style={{ marginTop: '35%' }}>Registration Successful 🎉</IonTitle>
-                <IonText>
+                <IonTitle style={{ marginTop: '35%', color: 'white' }}>Registration Successful 🎉</IonTitle>
+                <IonText style={{ color: '#a1a1aa' }}>
                   <p>Your account has been created successfully.</p>
                   <p>Please check your email address.</p>
                 </IonText>
