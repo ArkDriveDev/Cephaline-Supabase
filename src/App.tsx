@@ -23,9 +23,9 @@ import './theme/variables.css';
 /* Page imports */
 import Login from './pages/Login';
 import Registration from './pages/Register';
-import ForgotPassword from './pages/Forgotpassword';
 import ChangePass from './pages/Changepass';
 import Menu from './pages/Menu';
+import ForgotPassword from './pages/Forgotpassword';
 
 
 setupIonicReact();
