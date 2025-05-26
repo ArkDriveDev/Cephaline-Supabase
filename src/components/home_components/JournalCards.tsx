@@ -84,13 +84,13 @@ const JournalCards: React.FC<JournalCardsProps> = ({
       if (error) throw error;
 
       if (journalPages?.length) {
-        history.push(`/Cephaline-Supabase/app/Overviewing/${journalId}`);
+        history.push(`/app/Overviewing/${journalId}`);
       } else {
-        history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
+        history.push(`/app/JournalPage/${journalId}`);
       }
     } catch (err) {
       console.error('Error checking journal pages:', err);
-      history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}`);
+      history.push(`/app/JournalPage/${journalId}`);
     }
   };
 
