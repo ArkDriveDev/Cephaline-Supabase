@@ -48,7 +48,7 @@ const Login: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const [mfaState, setMfaState] = useState<MFAState>({
     showTotpModal: false,
     showFaceModal: false,
@@ -82,9 +82,9 @@ const Login: React.FC = () => {
 
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
       if (error) throw error;
@@ -112,7 +112,7 @@ const Login: React.FC = () => {
   const checkAuthFactors = async (user: any) => {
     try {
       const userId = user.id;
-      
+
       // Check all MFA methods in parallel
       const [
         { data: totpData },
@@ -279,7 +279,20 @@ const Login: React.FC = () => {
               >
                 Don't have an account? Register here
               </IonButton>
-
+              <IonButton
+                routerLink="/Cephaline-Supabase/ForgotPassword"
+                expand="full"
+                fill="clear"
+                style={{
+                  color: '#a1a1aa',
+                  textTransform: 'none',
+                  fontSize: '14px',
+                  fontWeight: 'normal',
+                  marginTop: '0'
+                }}
+              >
+                Forgot Password?
+              </IonButton>
               <AlertBox message={alertMessage} isOpen={showAlert} onClose={() => setShowAlert(false)} />
               <IonToast
                 isOpen={showToast}
