@@ -28,17 +28,18 @@ import Menu from './pages/Menu';
 import ForgotPassword from './pages/Forgotpassword';
 
 
+
 setupIonicReact();
 
 const App: React.FC = () => (
   <IonApp>
     <IonReactRouter>
         <IonRouterOutlet>
-          <Route exact path="/Cephaline-Supabase" component={Login} />
-          <Route exact path="/Cephaline-Supabase/registration" component={Registration} />
-          <Route exact path="/Cephaline-Supabase/forgotpassword" component={ForgotPassword} />
-          <Route exact path="/Cephaline-Supabase/changepassword" component={ChangePass} />
-          <Route path="/Cephaline-Supabase/app" component={Menu} />
+          <Route exact path="/" component={Login} />
+          <Route exact path="/registration" component={Registration} />
+          <Route exact path="/forgotpassword" component={ForgotPassword} />
+          <Route exact path="/changepassword" component={ChangePass} />
+          <Route path="/app" component={Menu} />
         </IonRouterOutlet>
     </IonReactRouter>
   </IonApp>
