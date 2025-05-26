@@ -11,7 +11,7 @@ import {
   IonText,
   IonProgressBar
 } from '@ionic/react';
-import { logoIonic } from 'ionicons/icons';
+import favicons from '../images/favicon.png';
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 
@@ -87,14 +87,14 @@ const ChangePass: React.FC = () => {
 
   const calculatePasswordStrength = (password: string) => {
     let strength = 0;
-    
+
     if (password.length >= 8) strength += 1;
     if (password.length >= 12) strength += 1;
     if (/[A-Z]/.test(password)) strength += 1;
     if (/[a-z]/.test(password)) strength += 1;
     if (/[0-9]/.test(password)) strength += 1;
     if (/[^A-Za-z0-9]/.test(password)) strength += 1;
-    
+
     if (strength <= 2) return { value: 0.25, label: 'Very Weak', color: 'danger' };
     if (strength <= 4) return { value: 0.5, label: 'Weak', color: 'warning' };
     if (strength <= 6) return { value: 0.75, label: 'Strong', color: 'success' };
@@ -132,7 +132,7 @@ const ChangePass: React.FC = () => {
       setShowToast(true);
       setAlertMessage("Password updated successfully!");
       setShowAlert(true);
-      
+
       await supabase.auth.signOut();
       navigation.push('/Cephaline-Supabase', 'root', 'replace');
     } catch (error: any) {
@@ -169,18 +169,26 @@ const ChangePass: React.FC = () => {
           }}>
             <IonAvatar
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 width: '100px',
                 height: '100px',
+                borderRadius: '50%',
+                overflow: 'hidden',
                 backgroundColor: '#2c2c2e',
                 marginBottom: '1.5rem'
               }}
             >
-              <IonIcon icon={logoIonic} style={{ fontSize: '80px', color: '#3880ff' }} />
+              <img
+                src={favicons}
+                alt="Logo"
+              />
             </IonAvatar>
 
-            <h1 style={{ 
-              color: '#ffffff', 
-              fontWeight: 'bold', 
+            <h1 style={{
+              color: '#ffffff',
+              fontWeight: 'bold',
               fontSize: '22px',
               margin: '0 0 8px 0'
             }}>
@@ -188,8 +196,8 @@ const ChangePass: React.FC = () => {
             </h1>
 
             {email && (
-              <p style={{ 
-                color: '#a1a1aa', 
+              <p style={{
+                color: '#a1a1aa',
                 fontSize: '14px',
                 margin: '0 0 24px 0'
               }}>
@@ -217,8 +225,8 @@ const ChangePass: React.FC = () => {
 
               {newPassword && (
                 <div style={{ width: '100%', marginTop: '8px' }}>
-                  <IonProgressBar 
-                    value={passwordStrength.value} 
+                  <IonProgressBar
+                    value={passwordStrength.value}
                     color={passwordStrength.color}
                     style={{ height: '4px' }}
                   />
@@ -264,8 +272,8 @@ const ChangePass: React.FC = () => {
               {isLoading ? 'UPDATING...' : 'UPDATE PASSWORD'}
             </IonButton>
 
-            <div style={{ 
-              width: '100%', 
+            <div style={{
+              width: '100%',
               color: '#a1a1aa',
               fontSize: '12px',
               marginTop: '1.5rem'
