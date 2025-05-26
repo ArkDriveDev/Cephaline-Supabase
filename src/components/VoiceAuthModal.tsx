@@ -12,6 +12,7 @@ import {
 } from '@ionic/react';
 import { mic, checkmarkCircle, closeCircle, close } from 'ionicons/icons';
 import { supabase } from '../utils/supaBaseClient';
+import { voiceAuthService } from '../services/voice-auth.service';
 
 interface VoiceAuthModalProps {
   isOpen: boolean;
@@ -30,27 +31,20 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
 }) => {
   const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'success' | 'error' | 'unsupported'>('idle');
   const [error, setError] = useState('');
-  const [recognition, setRecognition] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  const isBrowserSupported = () => {
-    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-  };
-
   useEffect(() => {
-    if (!isBrowserSupported()) {
+    if (!voiceAuthService.isBrowserSupported()) {
       setStatus('unsupported');
     }
     
     return () => {
-      if (recognition) {
-        recognition.stop();
-      }
+      voiceAuthService.stop();
     };
   }, []);
 
   const handleListenStart = () => {
-    if (!isBrowserSupported()) {
+    if (!voiceAuthService.isBrowserSupported()) {
       setStatus('unsupported');
       return;
     }
@@ -58,58 +52,46 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
     setStatus('listening');
     setError('');
 
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    const newRecognition = new SpeechRecognition();
-    setRecognition(newRecognition);
-
-    newRecognition.continuous = false;
-    newRecognition.interimResults = false;
-    newRecognition.lang = 'en-US';
-
-    newRecognition.onresult = async (event: any) => {
-      setStatus('processing');
-      try {
-        const spokenText = event.results[0][0].transcript;
-        
-        const { data, error: supabaseError } = await supabase
-          .from('user_voice_passwords')
-          .select('password')
-          .eq('user_id', userId)
-          .single();
-
-        if (supabaseError || !data?.password) {
-          throw new Error('Voice authentication not set up');
-        }
-
-        if (data.password.toLowerCase().trim() === spokenText.toLowerCase().trim()) {
-          await supabase
+    voiceAuthService.startListening(
+      async (spokenText) => {
+        setStatus('processing');
+        try {
+          const { data, error: supabaseError } = await supabase
             .from('user_voice_passwords')
-            .update({ last_used_at: new Date().toISOString() })
-            .eq('user_id', userId);
+            .select('password')
+            .eq('user_id', userId)
+            .single();
 
-          setStatus('success');
-          setTimeout(() => onAuthSuccess(), 1000);
-        } else {
-          throw new Error('Voice authentication failed');
+          if (supabaseError || !data?.password) {
+            throw new Error('Voice authentication not set up');
+          }
+
+          // Compare both in uppercase
+          if (data.password.toUpperCase().trim() === spokenText.toUpperCase().trim()) {
+            await supabase
+              .from('user_voice_passwords')
+              .update({ last_used_at: new Date().toISOString() })
+              .eq('user_id', userId);
+
+            setStatus('success');
+            setTimeout(() => onAuthSuccess(), 1000);
+          } else {
+            throw new Error('Voice authentication failed');
+          }
+        } catch (err) {
+          setStatus('error');
+          setError(err instanceof Error ? err.message : 'Verification failed');
         }
-      } catch (err) {
+      },
+      (error) => {
         setStatus('error');
-        setError(err instanceof Error ? err.message : 'Verification failed');
+        setError(error === 'no-speech' ? 'No speech detected' : 'Recognition error');
       }
-    };
-
-    newRecognition.onerror = (event: any) => {
-      setStatus('error');
-      setError(event.error === 'no-speech' ? 'No speech detected' : 'Recognition error');
-    };
-
-    newRecognition.start();
+    );
   };
 
   const handleStopListening = () => {
-    if (recognition) {
-      recognition.stop();
-    }
+    voiceAuthService.stop();
     setStatus('idle');
   };
 

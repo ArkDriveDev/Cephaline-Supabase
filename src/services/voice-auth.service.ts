@@ -34,7 +34,7 @@ class VoiceAuthService {
     this.recognition.lang = 'en-US';
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript.trim();
+      const transcript = event.results[0][0].transcript.toUpperCase().trim(); // Convert to uppercase
       this.onResult?.(transcript);
       this.stop();
     };
