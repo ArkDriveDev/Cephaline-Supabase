@@ -135,7 +135,7 @@ const verifyToken = async (email: string | null, token: string | null) => {
       setShowAlert(true);
 
       await supabase.auth.signOut();
-      navigation.push('/Cephaline-Supabase', 'root', 'replace');
+      navigation.push('/', 'root', 'replace');
     } catch (error: any) {
       setAlertMessage(error.message || "Password update failed. Please try again.");
       setShowAlert(true);
