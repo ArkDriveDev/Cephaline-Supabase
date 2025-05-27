@@ -26,7 +26,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   onToggleChange,
   disabled
 }) => {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(initialEnabled);
   const [voicePassword, setVoicePassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -36,8 +36,23 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   const [isInitializing, setIsInitializing] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Handle prop changes
+  useEffect(() => {
+    if (!isInitializing) {
+      setEnabled(initialEnabled);
+      // Sync with Supabase when enabled via props
+      if (initialEnabled) {
+        checkExistingVoicePassword();
+      } else {
+        setHasExistingPassword(false);
+      }
+    }
+  }, [initialEnabled]);
+
+  // Initial setup and auth state listener
   useEffect(() => {
     let isMounted = true;
+    
     const initializeComponent = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -45,9 +60,18 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
         if (user) {
           await checkExistingVoicePassword();
+        } else {
+          setEnabled(false);
+          setHasExistingPassword(false);
+          onToggleChange(false);
         }
       } catch (error) {
         console.error('Initialization error:', error);
+        if (isMounted) {
+          setEnabled(false);
+          setHasExistingPassword(false);
+          onToggleChange(false);
+        }
       } finally {
         if (isMounted) {
           setIsInitializing(false);
@@ -57,10 +81,10 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
     initializeComponent();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
       
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' && session?.user) {
         await checkExistingVoicePassword();
       } else if (event === 'SIGNED_OUT') {
         setEnabled(false);
@@ -76,12 +100,6 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isInitializing) {
-      setEnabled(initialEnabled);
-    }
-  }, [initialEnabled, isInitializing]);
-
   const checkExistingVoicePassword = async () => {
     try {
       setIsProcessing(true);
@@ -90,6 +108,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       if (authError || !user) {
         setEnabled(false);
         setHasExistingPassword(false);
+        onToggleChange(false);
         return;
       }
 
@@ -99,26 +118,31 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error || !voicePasswordData) {
+      if (error) throw error;
+
+      if (voicePasswordData) {
+        setVoicePassword('');
+        setHasExistingPassword(true);
+        setEnabled(true);
+        onToggleChange(true);
+      } else {
         setEnabled(false);
         setHasExistingPassword(false);
-        return;
+        onToggleChange(false);
       }
-
-      setVoicePassword('');
-      setHasExistingPassword(true);
-      setEnabled(true);
-      onToggleChange(true);
     } catch (error) {
       console.error('Error checking voice password:', error);
       setEnabled(false);
       setHasExistingPassword(false);
+      onToggleChange(false);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleToggleChange = async (checked: boolean) => {
+    if (disabled || isProcessing) return;
+    
     if (!checked && hasExistingPassword) {
       await handleCancel();
     } else {
