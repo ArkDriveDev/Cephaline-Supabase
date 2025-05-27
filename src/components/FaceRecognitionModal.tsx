@@ -11,7 +11,7 @@ import {
 } from '@ionic/react';
 import { cameraReverse, close } from 'ionicons/icons';
 import Webcam from 'react-webcam';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 
 interface VerificationResponse {
@@ -115,6 +115,17 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     }
   };
 
+  // Automatically capture when webcam is ready
+  useEffect(() => {
+    if (isOpen && status === 'ready') {
+      const timer = setTimeout(() => {
+        capture();
+      }, 1000); // Wait 1 second for the camera to initialize
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, status, capture]);
+
   return (
     <IonModal isOpen={isOpen} onDidDismiss={resetModal}>
       <IonHeader>
@@ -200,18 +211,7 @@ const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                   <IonButton onClick={handleRetry}>
                     Try Again
                   </IonButton>
-                ) : (
-                  <IonButton
-                    onClick={capture}
-                    disabled={status !== 'ready'}
-                  >
-                    {status === 'verifying' ? (
-                      <IonSpinner name="dots" />
-                    ) : (
-                      'Verify Face'
-                    )}
-                  </IonButton>
-                )}
+                ) : null}
 
                 <IonButton
                   onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
