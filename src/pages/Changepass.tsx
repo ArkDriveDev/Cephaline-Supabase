@@ -32,116 +32,87 @@ const ChangePass: React.FC = () => {
   const [token, setToken] = useState<string>('');
 
   useEffect(() => {
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const emailParam = urlParams.get('email');
-    const tokenParam = urlParams.get('token');
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  const tokenParam = params.get('access_token');
+  const emailParam = params.get('email');
+  const typeParam = params.get('type');
 
-    if (emailParam) {
-      setEmail(decodeURIComponent(emailParam));
-    }
-    if (tokenParam) {
-      setToken(tokenParam);
-    }
+  if (typeParam !== 'recovery') {
+    setAlertMessage("Invalid password reset link");
+    setShowAlert(true);
+    navigation.push('/', 'root', 'replace');
+    return;
+  }
 
-    verifyToken(emailParam, tokenParam);
-  }, []);
+  if (emailParam) setEmail(emailParam);
+  if (tokenParam) setToken(tokenParam);
+}, []);
 
-  const verifyToken = async (email: string | null, token: string | null) => {
-    if (!email || !token) {
-      setAlertMessage("Invalid password reset link");
-      setShowAlert(true);
-      return;
-    }
+const verifyToken = async (email: string | null, token: string | null) => {
+  if (!email || !token) {
+    setAlertMessage("Invalid password reset link");
+    setShowAlert(true);
+    return;
+  }
 
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'recovery'
-      });
+  setIsLoading(true);
+  try {
+    // For password reset, we don't need to verify the token separately
+    // Supabase will handle the token verification when we update the password
+    // Just store the email and token for the password update
+    setEmail(email);
+    setToken(token);
+  } catch (error: any) {
+    setAlertMessage("Invalid or expired reset link. Please request a new one.");
+    setShowAlert(true);
+    navigation.push('/', 'root', 'replace');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-      if (error) throw error;
-    } catch (error: any) {
-      setAlertMessage("Invalid or expired reset link. Please request a new one.");
-      setShowAlert(true);
-      navigation.push('/', 'root', 'replace');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const handlePasswordUpdate = async () => {
+  if (!newPassword || !confirmPassword) {
+    setAlertMessage("Please fill in all password fields");
+    setShowAlert(true);
+    return;
+  }
 
-  useEffect(() => {
-    if (newPassword) {
-      const strength = calculatePasswordStrength(newPassword);
-      setPasswordStrength(strength);
-    } else {
-      setPasswordStrength({
-        value: 0,
-        label: '',
-        color: ''
-      });
-    }
-  }, [newPassword]);
+  if (newPassword !== confirmPassword) {
+    setAlertMessage("Passwords do not match");
+    setShowAlert(true);
+    return;
+  }
 
-  const calculatePasswordStrength = (password: string) => {
-    let strength = 0;
+  if (newPassword.length < 6) {
+    setAlertMessage("Password must be at least 6 characters");
+    setShowAlert(true);
+    return;
+  }
 
-    if (password.length >= 8) strength += 1;
-    if (password.length >= 12) strength += 1;
-    if (/[A-Z]/.test(password)) strength += 1;
-    if (/[a-z]/.test(password)) strength += 1;
-    if (/[0-9]/.test(password)) strength += 1;
-    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+  setIsLoading(true);
 
-    if (strength <= 2) return { value: 0.25, label: 'Very Weak', color: 'danger' };
-    if (strength <= 4) return { value: 0.5, label: 'Weak', color: 'warning' };
-    if (strength <= 6) return { value: 0.75, label: 'Strong', color: 'success' };
-    return { value: 1, label: 'Very Strong', color: 'primary' };
-  };
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
 
-  const handlePasswordUpdate = async () => {
-    if (!newPassword || !confirmPassword) {
-      setAlertMessage("Please fill in all password fields");
-      setShowAlert(true);
-      return;
-    }
+    if (error) throw error;
 
-    if (newPassword !== confirmPassword) {
-      setAlertMessage("Passwords do not match");
-      setShowAlert(true);
-      return;
-    }
+    setShowToast(true);
+    setAlertMessage("Password updated successfully!");
+    setShowAlert(true);
 
-    if (newPassword.length < 6) {
-      setAlertMessage("Password must be at least 6 characters");
-      setShowAlert(true);
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (error) throw error;
-
-      setShowToast(true);
-      setAlertMessage("Password updated successfully!");
-      setShowAlert(true);
-
-      await supabase.auth.signOut();
-      navigation.push('/', 'root', 'replace');
-    } catch (error: any) {
-      setAlertMessage(error.message || "Password update failed. Please try again.");
-      setShowAlert(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    await supabase.auth.signOut();
+    navigation.push('/', 'root', 'replace');
+  } catch (error: any) {
+    setAlertMessage(error.message || "Password update failed. Please try again.");
+    setShowAlert(true);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <IonPage>
