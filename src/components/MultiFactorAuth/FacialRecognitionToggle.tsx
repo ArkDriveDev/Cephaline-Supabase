@@ -49,20 +49,33 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const detectorRef = useRef<faceDetection.FaceDetector | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  // Check environment on mount
+  // Check environment and auth state on mount
   useEffect(() => {
     const isProduction = window.location.host.includes('github.io');
     setIsGhPages(isProduction);
     
-    if (initialEnabled) checkExistingPhoto();
-    return () => cleanupCamera();
+    checkExistingPhoto();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        checkExistingPhoto();
+      }
+    });
+
+    return () => {
+      cleanupCamera();
+      subscription?.unsubscribe();
+    };
   }, []);
 
   // Check for existing facial enrollment
   const checkExistingPhoto = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No authenticated user');
+      if (!user) {
+        setEnabled(false);
+        return;
+      }
 
       const { data: enrollment } = await supabase
         .from('user_facial_enrollments')
@@ -70,18 +83,27 @@ const FacialRecognitionToggle: React.FC<Props> = ({
         .eq('user_id', user.id)
         .single();
 
-      if (!enrollment?.storage_path) throw new Error('No enrollment found');
+      if (!enrollment?.storage_path) {
+        setEnabled(false);
+        return;
+      }
 
       const { data: signedUrlData } = await supabase.storage
         .from('facial-recognition')
         .createSignedUrl(enrollment.storage_path, 3600);
 
-      if (!signedUrlData) throw new Error('Failed to generate signed URL');
+      if (!signedUrlData) {
+        setEnabled(false);
+        return;
+      }
       
       setPhoto(signedUrlData.signedUrl);
       setEnabled(true);
+      onToggleChange(true);
     } catch (error) {
       console.error('Photo check error:', error);
+      setEnabled(false);
+      onToggleChange(false);
       await cleanupEnrollment();
     }
   };
@@ -256,12 +278,36 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const handleToggle = async (e: CustomEvent) => {
     const isEnabled = e.detail.checked;
     
+    // If disabling, clean up
     if (!isEnabled) {
       await cleanupEnrollment();
       return;
     }
     
-    if (!photo) await startCamera();
+    // If enabling, check if we already have a photo
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setToastMessage('Please sign in first');
+      setShowToast(true);
+      setEnabled(false);
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from('user_facial_enrollments')
+      .select()
+      .eq('user_id', user.id)
+      .single();
+
+    if (existing) {
+      // Already enrolled, just enable
+      setEnabled(true);
+      onToggleChange(true);
+      await checkExistingPhoto();
+    } else {
+      // Need to enroll
+      await startCamera();
+    }
   };
 
   // Cleanup enrollment data
