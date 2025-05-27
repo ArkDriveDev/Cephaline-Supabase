@@ -38,45 +38,45 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   const [error, setError] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
-  const verifyRecoveryCode = async (rawCode: string): Promise<boolean> => {
-    if (!userId) {
-      setError('User not identified');
-      return false;
-    }
+const verifyRecoveryCode = async (rawCode: string): Promise<boolean> => {
+  if (!userId) {
+    setError('User not identified');
+    return false;
+  }
 
-    const cleanCode = rawCode.trim(); // Just trim whitespace, no hashing
+  const cleanCode = rawCode.trim();
 
-    try {
-      // Step 1: Check if code exists and is active
-      const { data: codeRecord, error: findError } = await supabase
-        .from('recovery_codes')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('code_hash', cleanCode) // Direct comparison
-        .eq('code_status', 'active')
-        .maybeSingle();
+  try {
+    // Step 1: Check if code exists and is active for this user
+    const { data: codeRecord, error: findError } = await supabase
+      .from('recovery_codes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('code_hash', cleanCode) // Direct comparison with plain text code
+      .eq('code_status', 'active')
+      .maybeSingle();
 
-      if (findError) throw findError;
-      if (!codeRecord) return false;
+    if (findError) throw findError;
+    if (!codeRecord) return false;
 
-      // Step 2: Mark code as used
-      const { error: updateError } = await supabase
-        .from('recovery_codes')
-        .update({
-          code_status: 'used',
-          used_at: new Date().toISOString()
-        })
-        .eq('user_id', codeRecord.user_id);
+    // Step 2: Mark only this specific code as used using both parts of the composite key
+    const { error: updateError } = await supabase
+      .from('recovery_codes')
+      .update({
+        code_status: 'used',
+        used_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('code_hash', cleanCode); // Update only the exact matching code
 
-      if (updateError) throw updateError;
+    if (updateError) throw updateError;
 
-      return true;
-    } catch (err) {
-      console.error('Recovery code verification error:', err);
-      return false;
-    }
-  };
-
+    return true;
+  } catch (err) {
+    console.error('Recovery code verification error:', err);
+    return false;
+  }
+};
   const handleSubmit = async () => {
     if (!code.trim()) {
       setError('Please enter a recovery code');
@@ -131,7 +131,7 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
                 className={error ? 'ion-invalid' : ''}
                 clearInput
                 disabled={isSubmitting}
-                inputMode="numeric" // Better for numeric codes
+                inputMode="numeric"
               />
               
               {error && (

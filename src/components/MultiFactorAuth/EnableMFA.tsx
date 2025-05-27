@@ -55,12 +55,11 @@ const EnableMFA: React.FC = () => {
         if (user) {
           setUser(user);
 
-          // Check recovery codes
+          // Check ALL recovery codes (both active and used)
           const { data: codesData, error: codesError } = await supabase
             .from('recovery_codes')
             .select('code_hash, code_status')
-            .eq('user_id', user.id)
-            .eq('code_status', 'active');
+            .eq('user_id', user.id);
 
           if (codesError) throw codesError;
 
@@ -87,11 +86,13 @@ const EnableMFA: React.FC = () => {
           const hasTOTP = (totpCount ?? 0) > 0;
           const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
           const hasVoice = voiceData !== null;
+          const hasActiveRecoveryCodes = codesData?.some(code => code.code_status === 'active') ?? false;
 
           if (codesData) setRecoveryCodes(codesData);
 
-          // MFA is enabled if we have recovery codes or active methods
-          setIsEnabled((codesData && codesData.length > 0) || hasTOTP || hasFacial || hasVoice);
+          // MFA is enabled if we have any active MFA method
+          const mfaEnabled = hasTOTP || hasFacial || hasVoice || hasActiveRecoveryCodes;
+          setIsEnabled(mfaEnabled);
 
           // Set active method (prioritize TOTP if multiple exist)
           setActiveMFAMethod(
@@ -170,29 +171,24 @@ const EnableMFA: React.FC = () => {
     }
   };
 
-  // Disable MFA
-  // Disable MFA
-  // Disable MFA
   const confirmDisableMFA = async (confirm: boolean) => {
     setShowDisableConfirm(false);
     if (!confirm || !user) return;
 
     setPendingToggle(true);
     try {
-      // 1. Delete all recovery codes
+      // Delete all recovery codes (both active and used)
       await deleteAllRecoveryCodes(user.id);
 
-      // 2. Delete TOTP codes - enhanced version with error handling
-      // 2. Delete TOTP codes - properly count deleted records
-      const { error: totpError, count: totpDeletedCount } = await supabase
-        .from('user_totp')
-        .delete({ count: 'exact' })  // Move count option here
+      // Delete TOTP codes
+      const { error: totpError } = await supabase
+        .from('totp_codes')
+        .delete()
         .eq('user_id', user.id);
 
       if (totpError) throw totpError;
-      console.log(`Deleted ${totpDeletedCount || 0} TOTP records`);
 
-      // 3. Delete facial recognition database record
+      // Delete facial recognition data
       const { error: facialEnrollmentError } = await supabase
         .from('user_facial_enrollments')
         .delete()
@@ -200,29 +196,23 @@ const EnableMFA: React.FC = () => {
 
       if (facialEnrollmentError) throw facialEnrollmentError;
 
-      // 4. Delete facial recognition files from storage (optimized)
+      // Delete facial recognition files
       try {
-        const { data: files, error: listError } = await supabase.storage
+        const { data: files } = await supabase.storage
           .from('facial-recognition')
           .list(user.id);
 
-        if (listError) throw listError;
-
         if (files && files.length > 0) {
           const filePaths = files.map(file => `${user.id}/${file.name}`);
-          const { error: deleteError } = await supabase.storage
+          await supabase.storage
             .from('facial-recognition')
             .remove(filePaths);
-
-          if (deleteError) throw deleteError;
-          console.log(`Deleted ${filePaths.length} facial recognition files`);
         }
       } catch (storageError) {
         console.error('Facial storage cleanup error:', storageError);
-        // Non-critical failure - continue with other operations
       }
 
-      // 5. Delete voice password
+      // Delete voice password
       const { error: voicePasswordError } = await supabase
         .from('user_voice_passwords')
         .delete()
@@ -237,18 +227,9 @@ const EnableMFA: React.FC = () => {
       setToastMessage('All MFA methods disabled successfully!');
       setShowToast(true);
 
-      // Optional: Log the MFA disable event
-      await supabase
-        .from('audit_logs')
-        .insert({
-          user_id: user.id,
-          action: 'mfa_disabled',
-          details: { methods: ['totp', 'recovery_codes', 'facial', 'voice'] }
-        });
-
     } catch (error: any) {
       console.error('Error disabling MFA:', error);
-      setToastMessage(error.message || 'Failed to completely disable MFA. Some elements may remain active.');
+      setToastMessage(error.message || 'Failed to completely disable MFA');
       setShowToast(true);
     } finally {
       setPendingToggle(false);
@@ -379,12 +360,15 @@ const EnableMFA: React.FC = () => {
         </IonCardContent>
       </IonCard>
 
-      {isEnabled && (
+    {isEnabled && (
         <>
           {recoveryCodes.length > 0 && (
             <IonCard>
               <IonCardHeader>
                 <IonCardTitle>Your Recovery Codes</IonCardTitle>
+                <IonText color="medium">
+                  <p>Save these codes in a secure place. Active codes can be used once.</p>
+                </IonText>
                 <IonButton
                   expand="block"
                   onClick={regenerateRecoveryCodes}
@@ -396,15 +380,18 @@ const EnableMFA: React.FC = () => {
                 </IonButton>
               </IonCardHeader>
               <IonCardContent>
-                <IonText color="medium">
-                  <p>Save these codes in a secure place. Each code can be used only once.</p>
-                </IonText>
-
                 <IonList lines="full" className="ion-margin-vertical">
                   {recoveryCodes.map((code, index) => (
                     <IonItem key={index}>
                       <IonLabel>
-                        <h3>{code.code_hash}</h3>
+                        <h3 style={{ color: code.code_status === 'active' ? 'inherit' : '#999' }}>
+                          {code.code_hash}
+                          {code.code_status === 'used' && (
+                            <span style={{ marginLeft: '8px', fontSize: '0.8em', color: '#f00' }}>
+                              (Used)
+                            </span>
+                          )}
+                        </h3>
                         <p>Status: {code.code_status}</p>
                       </IonLabel>
                     </IonItem>
@@ -425,7 +412,6 @@ const EnableMFA: React.FC = () => {
               </IonCardContent>
             </IonCard>
           )}
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', marginTop: '10px' }}>
             <TotpToggle
               userId={user?.id || ''}
