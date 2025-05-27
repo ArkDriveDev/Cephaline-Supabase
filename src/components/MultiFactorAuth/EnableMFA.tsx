@@ -46,72 +46,68 @@ const EnableMFA: React.FC = () => {
   const [activeMFAMethod, setActiveMFAMethod] = useState<'totp' | 'facial' | 'voice' | null>(null);
 
   // Check MFA status on load
-  useEffect(() => {
-    const checkMFAStatus = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) throw error;
+useEffect(() => {
+  const checkMFAStatus = async () => {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      setLoadingUser(false);
+      return;
+    }
 
-        if (user) {
-          setUser(user);
+    setUser(user);
 
-          // Check ALL recovery codes (both active and used)
-          const { data: codesData, error: codesError } = await supabase
-            .from('recovery_codes')
-            .select('code_hash, code_status')
-            .eq('user_id', user.id);
+    // Parallel queries (no individual try-catch since tables are confirmed to exist)
+    const [
+      { data: recoveryCodes },
+      { data: totp },
+      { data: facialEnrollment },
+      { data: voicePassword },
+      { data: facialFiles }
+    ] = await Promise.all([
+      supabase.from('recovery_codes')
+        .select('code_hash, code_status')
+        .eq('user_id', user.id),
+      
+      supabase.from('user_totp')
+        .select('is_verified')
+        .eq('user_id', user.id)
+        .single(),
+      
+      supabase.from('user_facial_enrollments')
+        .select('is_active, storage_path')
+        .eq('user_id', user.id)
+        .single(),
+      
+      supabase.from('user_voice_passwords')
+        .select('password')
+        .eq('user_id', user.id)
+        .single(),
+      
+      supabase.storage.from('facial-recognition')
+        .list(`${user.id}/`)
+    ]);
 
-          if (codesError) throw codesError;
+    // Determine MFA status
+    const hasTOTP = totp?.is_verified ?? false;
+    const hasFacial = (facialEnrollment?.is_active && facialFiles?.some(f => f.name === 'profile.jpg')) ?? false;
+    const hasVoice = !!voicePassword?.password;
+    const hasActiveRecoveryCodes = (recoveryCodes?.some(c => c.code_status === 'active')) ?? false;
 
-          // Check TOTP status
-          const { count: totpCount } = await supabase
-            .from('totp_codes')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-            .is('used_at', null);
+    setRecoveryCodes(recoveryCodes || []);
+    setIsEnabled(hasTOTP || hasFacial || hasVoice || hasActiveRecoveryCodes);
 
-          // Check Facial Recognition
-          const { data: facialFiles } = await supabase.storage
-            .from('facial-recognition')
-            .list(`${user.id}/`);
+    setActiveMFAMethod(
+      hasTOTP ? 'totp' :
+      hasFacial ? 'facial' :
+      hasVoice ? 'voice' :
+      null
+    );
+    
+    setLoadingUser(false);
+  };
 
-          // Check Voice Password
-          const { data: voiceData } = await supabase
-            .from('voice_passwords')
-            .select('*')
-            .eq('user_id', user.id)
-            .is('verified_at', null)
-            .single();
-
-          const hasTOTP = (totpCount ?? 0) > 0;
-          const hasFacial = facialFiles?.some(file => file.name === 'profile.jpg') ?? false;
-          const hasVoice = voiceData !== null;
-          const hasActiveRecoveryCodes = codesData?.some(code => code.code_status === 'active') ?? false;
-
-          if (codesData) setRecoveryCodes(codesData);
-
-          // MFA is enabled if we have any active MFA method
-          const mfaEnabled = hasTOTP || hasFacial || hasVoice || hasActiveRecoveryCodes;
-          setIsEnabled(mfaEnabled);
-
-          // Set active method (prioritize TOTP if multiple exist)
-          setActiveMFAMethod(
-            hasTOTP ? 'totp' :
-              hasFacial ? 'facial' :
-                hasVoice ? 'voice' :
-                  null
-          );
-        }
-      } catch (error) {
-        console.error('Error checking MFA status:', error);
-        setToastMessage('Failed to load MFA status');
-        setShowToast(true);
-      } finally {
-        setLoadingUser(false);
-      }
-    };
-    checkMFAStatus();
-  }, []);
+  checkMFAStatus();
+}, []);
 
   // Generate recovery codes
   const generateRecoveryCodes = async (userId: string) => {

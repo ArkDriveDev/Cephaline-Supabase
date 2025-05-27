@@ -15,7 +15,7 @@ import favicons from '../images/favicon.png';
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 
-const ChangePass: React.FC = () => {
+const Changepass: React.FC = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
@@ -279,4 +279,4 @@ const ChangePass: React.FC = () => {
     );
 };
 
-export default ChangePass;
+export default Changepass;
