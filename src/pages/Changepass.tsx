@@ -28,50 +28,6 @@ const ChangePass: React.FC = () => {
     label: '',
     color: ''
   });
-  const [email, setEmail] = useState<string>('');
-  const [token, setToken] = useState<string>('');
-
-  useEffect(() => {
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const emailParam = urlParams.get('email');
-    const tokenParam = urlParams.get('token');
-
-    if (emailParam) {
-      setEmail(decodeURIComponent(emailParam));
-    }
-    if (tokenParam) {
-      setToken(tokenParam);
-    }
-
-    verifyToken(emailParam, tokenParam);
-  }, []);
-
-
-const verifyToken = async (email: string | null, token: string | null) => {
-    if (!email || !token) {
-      setAlertMessage("Invalid password reset link");
-      setShowAlert(true);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'recovery'
-      });
-
-      if (error) throw error;
-    } catch (error: any) {
-      setAlertMessage("Invalid or expired reset link. Please request a new one.");
-      setShowAlert(true);
-      navigation.push('/', 'root', 'replace');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (newPassword) {
@@ -195,16 +151,6 @@ const verifyToken = async (email: string | null, token: string | null) => {
             }}>
               Set New Password
             </h1>
-
-            {email && (
-              <p style={{
-                color: '#a1a1aa',
-                fontSize: '14px',
-                margin: '0 0 24px 0'
-              }}>
-                For: {email}
-              </p>
-            )}
 
             <div style={{ width: '100%', marginBottom: '1rem' }}>
               <IonInput
