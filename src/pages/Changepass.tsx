@@ -67,7 +67,7 @@ const verifyToken = async (email: string | null, token: string | null) => {
     } catch (error: any) {
       setAlertMessage("Invalid or expired reset link. Please request a new one.");
       setShowAlert(true);
-      navigation.push('/Cephaline-Supabase', 'root', 'replace');
+      navigation.push('/', 'root', 'replace');
     } finally {
       setIsLoading(false);
     }
