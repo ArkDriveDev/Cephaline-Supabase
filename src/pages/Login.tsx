@@ -310,7 +310,7 @@ const Login: React.FC = () => {
                 Don't have an account? Register here
               </IonButton>
               <IonButton
-                routerLink="/forgotpassword"
+                routerLink="/forgotpass"
                 expand="full"
                 fill="clear"
                 style={{
