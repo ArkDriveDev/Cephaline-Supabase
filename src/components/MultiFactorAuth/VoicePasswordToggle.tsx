@@ -8,7 +8,6 @@ import {
   IonToggle,
   IonCard,
   IonCardContent,
-  IonText,
 } from '@ionic/react';
 import { supabase } from '../../utils/supaBaseClient';
 
@@ -16,14 +15,12 @@ interface VoicePasswordToggleProps {
   initialEnabled: boolean;
   onToggleChange: (enabled: boolean) => void;
   disabled: boolean;
-  minPasswordLength?: number;
 }
 
 const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   initialEnabled,
   onToggleChange,
-  disabled,
-  minPasswordLength = 4,
+  disabled
 }) => {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [voicePassword, setVoicePassword] = useState('');
@@ -32,23 +29,39 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [toastColor, setToastColor] = useState<'success' | 'warning' | 'danger'>('success');
   const [hasExistingPassword, setHasExistingPassword] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [hasCheckedDatabase, setHasCheckedDatabase] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const initialize = async () => {
-      await checkExistingVoicePassword();
-      setHasCheckedDatabase(true);
+    const checkAuthAndPassword = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await checkExistingVoicePassword();
+      }
+      setIsInitializing(false);
     };
-    initialize();
+
+    // Call immediately
+    checkAuthAndPassword();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN') {
+        await checkExistingVoicePassword();
+      } else if (event === 'SIGNED_OUT') {
+        setEnabled(false);
+        setHasExistingPassword(false);
+        setVoicePassword('');
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    // Only update from prop after we've checked the database
-    if (hasCheckedDatabase) {
-      setEnabled(initialEnabled);
-    }
-  }, [initialEnabled, hasCheckedDatabase]);
+    setEnabled(initialEnabled);
+  }, [initialEnabled]);
 
   const checkExistingVoicePassword = async () => {
     try {
@@ -57,6 +70,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       
       if (authError || !user) {
         console.log('No authenticated user');
+        setEnabled(false);
+        setHasExistingPassword(false);
         return;
       }
 
@@ -64,10 +79,12 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
         .from('user_voice_passwords')
         .select('password')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error || !voicePasswordData) {
         console.log('No existing voice password found');
+        setEnabled(false);
+        setHasExistingPassword(false);
         return;
       }
 
@@ -77,6 +94,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       onToggleChange(true);
     } catch (error) {
       console.error('Error checking for voice password:', error);
+      setEnabled(false);
+      setHasExistingPassword(false);
     } finally {
       setIsProcessing(false);
     }
@@ -84,8 +103,10 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
   const handleToggleChange = async (checked: boolean) => {
     if (!checked && hasExistingPassword) {
+      // If turning off and there's an existing password, delete it
       await handleCancel();
     } else {
+      // Otherwise just update local state
       setVoicePassword('');
       setEnabled(checked);
       onToggleChange(checked);
@@ -95,8 +116,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   const handleSubmit = async () => {
     const upperCasePassword = voicePassword.trim().toUpperCase();
     
-    if (!upperCasePassword || upperCasePassword.length < minPasswordLength) {
-      setToastMessage(`Password must be at least ${minPasswordLength} characters`);
+    if (!upperCasePassword) {
+      setToastMessage('Please enter a voice password');
       setToastColor('warning');
       setShowToast(true);
       return;
@@ -122,8 +143,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       setToastMessage('Voice password saved successfully');
       setToastColor('success');
       setVoicePassword(upperCasePassword);
-      setHasExistingPassword(true);
       setEnabled(true);
+      setHasExistingPassword(true);
       onToggleChange(true);
     } catch (error) {
       console.error('Error saving voice password:', error);
@@ -149,8 +170,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       }
 
       setVoicePassword('');
-      setHasExistingPassword(false);
       setEnabled(false);
+      setHasExistingPassword(false);
       onToggleChange(false);
       setToastMessage('Voice password removed');
       setToastColor('success');
@@ -165,7 +186,9 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     }
   };
 
-  const isPasswordValid = voicePassword.trim().length >= minPasswordLength;
+  if (isInitializing) {
+    return <IonSpinner name="crescent" />;
+  }
 
   return (
     <>
@@ -173,7 +196,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
         <IonLabel style={{ marginLeft: '1rem' }}>
           <strong>Enable Voice Password</strong>
         </IonLabel>
-        {isProcessing && !hasCheckedDatabase ? (
+        {isProcessing ? (
           <IonSpinner style={{ marginLeft: '1rem' }} name="crescent" />
         ) : (
           <IonToggle
@@ -195,17 +218,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
                   labelPlacement="floating"
                   value="********"
                   disabled
-                  type={showPassword ? 'text' : 'password'}
+                  type="password"
                 />
-                <div style={{ display: 'flex', marginTop: '0.5rem' }}>
-                  <IonButton
-                    fill="clear"
-                    size="small"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? 'Hide' : 'Show'}
-                  </IonButton>
-                </div>
                 <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
                   <IonButton
                     color="danger"
@@ -224,28 +238,12 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
                   value={voicePassword}
                   onIonChange={(e) => setVoicePassword(e.detail.value!.toUpperCase())}
                   disabled={isProcessing || disabled}
-                  type={showPassword ? 'text' : 'password'}
+                  type="password"
                 />
-                <div style={{ display: 'flex', marginTop: '0.5rem' }}>
-                  <IonButton
-                    fill="clear"
-                    size="small"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? 'Hide' : 'Show'}
-                  </IonButton>
-                </div>
-                {voicePassword && !isPasswordValid && (
-                  <IonText color="warning">
-                    <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                      Password must be at least {minPasswordLength} characters
-                    </p>
-                  </IonText>
-                )}
                 <div style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
                   <IonButton
                     onClick={handleSubmit}
-                    disabled={isProcessing || disabled || !isPasswordValid}
+                    disabled={isProcessing || disabled || !voicePassword.trim()}
                   >
                     {isProcessing ? 'Saving...' : 'Submit'}
                   </IonButton>
