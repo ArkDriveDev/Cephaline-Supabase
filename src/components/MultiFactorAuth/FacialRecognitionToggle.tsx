@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   IonToggle,
   IonLabel,
-  IonButton,
   IonCard,
   IonCardContent,
   IonIcon,
@@ -18,12 +17,12 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonFooter
+  IonFooter,
+  IonButton 
 } from '@ionic/react';
-import { camera, close } from 'ionicons/icons';
+import { close } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
-import * as tf from '@tensorflow/tfjs';
-import * as faceDetection from '@tensorflow-models/face-detection';
+import Human from '@vladmandic/human';
 
 interface Props {
   initialEnabled?: boolean;
@@ -42,18 +41,15 @@ const FacialRecognitionToggle: React.FC<Props> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showCameraModal, setShowCameraModal] = useState(false);
-  const [detectionActive, setDetectionActive] = useState(false);
-  const [isGhPages, setIsGhPages] = useState(false);
+  const [detectionStatus, setDetectionStatus] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const detectorRef = useRef<faceDetection.FaceDetector | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const humanRef = useRef<Human | null>(null);
+  const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const stableFaceCountRef = useRef(0);
 
   // Check environment and auth state on mount
   useEffect(() => {
-    const isProduction = window.location.host.includes('github.io');
-    setIsGhPages(isProduction);
-    
     checkExistingPhoto();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -108,72 +104,94 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     }
   };
 
-  // Initialize face detector with fallback
-  const initializeFaceDetector = async () => {
+  // Initialize Human.js
+  const initializeHuman = async () => {
     try {
-      await tf.ready();
-      
-      // Try WebGL first, fall back to CPU
-      try {
-        await tf.setBackend('webgl');
-      } catch (e) {
-        console.warn('WebGL not available, falling back to CPU');
-        await tf.setBackend('cpu');
-      }
+      const human = new Human({
+        backend: 'webgl',
+        modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models',
+        face: {
+          enabled: true,
+          detector: { rotation: true },
+          mesh: { enabled: true },
+          iris: { enabled: true },
+          description: { enabled: true },
+          emotion: { enabled: false },
+        },
+        filter: { enabled: false },
+        gesture: { enabled: false },
+        object: { enabled: false },
+      });
 
-      // Use CDN for GitHub Pages, local for dev
-      const solutionPath = isGhPages
-        ? 'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection'
-        : '/@mediapipe/face_detection';
-
-      detectorRef.current = await faceDetection.createDetector(
-        faceDetection.SupportedModels.MediaPipeFaceDetector,
-        {
-          runtime: 'mediapipe',
-          solutionPath,
-          modelType: 'short' // Faster model
-        }
-      );
+      await human.load();
+      await human.warmup();
+      humanRef.current = human;
       return true;
     } catch (error) {
-      console.error('Detector initialization failed:', error);
+      console.error('Human initialization failed:', error);
       return false;
     }
   };
 
   // Start face detection loop
   const startFaceDetection = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || !humanRef.current) return;
 
-    const success = await initializeFaceDetector();
-    if (!success) {
-      setToastMessage('Automatic detection unavailable. Please capture manually.');
-      setShowToast(true);
+    try {
+      const result = await humanRef.current.detect(videoRef.current);
+      processDetectionResult(result);
+      
+      if (showCameraModal) {
+        requestAnimationFrame(startFaceDetection);
+      }
+    } catch (error) {
+      console.error('Detection error:', error);
+      if (showCameraModal) {
+        setTimeout(() => startFaceDetection(), 100);
+      }
+    }
+  };
+
+  // Process detection results and determine if face is stable
+  const processDetectionResult = (result: any) => {
+    if (!result?.face || result.face.length === 0) {
+      setDetectionStatus('No face detected');
+      stableFaceCountRef.current = 0;
       return;
     }
 
-    setDetectionActive(true);
-    detectFaces();
-  };
+    // We only want one face
+    if (result.face.length > 1) {
+      setDetectionStatus('Multiple faces detected - please show only your face');
+      stableFaceCountRef.current = 0;
+      return;
+    }
 
-  // Face detection loop
-  const detectFaces = async () => {
-    if (!videoRef.current || !detectorRef.current || !detectionActive) return;
+    const face = result.face[0];
+    
+    // Check face quality
+    if (face.score < 0.8) {
+      setDetectionStatus('Face not clear - please move closer');
+      stableFaceCountRef.current = 0;
+      return;
+    }
 
-    try {
-      const faces = await detectorRef.current.estimateFaces(videoRef.current);
-      
-      if (faces.length === 1) {
-        await capturePhoto();
-        return;
-      }
+    // Check face rotation
+    if (Math.abs(face.rotation?.angle?.roll || 0) > 15 || 
+        Math.abs(face.rotation?.angle?.pitch || 0) > 15 || 
+        Math.abs(face.rotation?.angle?.yaw || 0) > 15) {
+      setDetectionStatus('Face not straight - please look directly at the camera');
+      stableFaceCountRef.current = 0;
+      return;
+    }
 
-      animationFrameRef.current = requestAnimationFrame(detectFaces);
-    } catch (error) {
-      console.error('Detection error:', error);
-      if (detectionActive) {
-        animationFrameRef.current = requestAnimationFrame(detectFaces);
-      }
+    // Face is good, increment stable count
+    stableFaceCountRef.current++;
+    setDetectionStatus(`Aligning face... ${Math.min(5, stableFaceCountRef.current)}/5`);
+
+    // If face has been stable for 5 frames, capture
+    if (stableFaceCountRef.current >= 5) {
+      capturePhoto();
     }
   };
 
@@ -192,13 +210,23 @@ const FacialRecognitionToggle: React.FC<Props> = ({
     canvas.toBlob(async (blob) => {
       if (blob) await uploadPhoto(blob);
       closeCamera();
-    }, 'image/jpeg', 0.8); // Reduced quality for faster uploads
+    }, 'image/jpeg', 0.9); // Higher quality for enrollment
   };
 
   // Start camera with error handling
   const startCamera = async () => {
     try {
       setShowCameraModal(true);
+      stableFaceCountRef.current = 0;
+      
+      const success = await initializeHuman();
+      if (!success) {
+        setToastMessage('Face detection initialization failed');
+        setShowToast(true);
+        closeCamera();
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           width: { ideal: 1280 },
@@ -210,14 +238,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        
-        // Skip auto-detection on GitHub Pages if problematic
-        if (!isGhPages) {
-          await startFaceDetection();
-        } else {
-          setToastMessage('Position face and click "Capture"');
-          setShowToast(true);
-        }
+        startFaceDetection();
       }
     } catch (error) {
       console.error('Camera error:', error);
@@ -343,18 +364,16 @@ const FacialRecognitionToggle: React.FC<Props> = ({
 
   // Cleanup camera resources
   const cleanupCamera = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
+    if (humanRef.current) {
+      humanRef.current = null;
     }
-    if (detectorRef.current) {
-      // @ts-ignore - dispose exists but isn't in types
-      if (detectorRef.current.dispose) detectorRef.current.dispose();
-      detectorRef.current = null;
+    if (detectionTimeoutRef.current) {
+      clearTimeout(detectionTimeoutRef.current);
     }
     if (videoRef.current?.srcObject) {
       (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
     }
-    setDetectionActive(false);
+    setDetectionStatus('');
   };
 
   const closeCamera = () => {
@@ -436,7 +455,7 @@ const FacialRecognitionToggle: React.FC<Props> = ({
             />
             <canvas ref={canvasRef} style={{ display: 'none' }} />
             
-            {detectionActive && (
+            {detectionStatus && (
               <div style={{
                 position: 'absolute',
                 bottom: '20px',
@@ -448,24 +467,16 @@ const FacialRecognitionToggle: React.FC<Props> = ({
                 padding: '10px',
                 borderRadius: '4px'
               }}>
-                <IonSpinner name="crescent" color="light" />
-                <span style={{ marginLeft: '8px' }}>Detecting face...</span>
+                {detectionStatus.includes('Aligning') && (
+                  <IonSpinner name="crescent" color="light" style={{ marginRight: '8px' }} />
+                )}
+                <span>{detectionStatus}</span>
               </div>
             )}
           </div>
         </IonContent>
         <IonFooter>
           <IonToolbar>
-            <IonButton 
-              expand="block" 
-              onClick={capturePhoto}
-              color="primary"
-              disabled={uploading}
-              style={{ margin: '8px' }}
-            >
-              <IonIcon icon={camera} slot="start" />
-              {uploading ? 'Processing...' : 'Capture'}
-            </IonButton>
             <IonButton 
               expand="block" 
               color="medium" 
