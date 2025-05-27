@@ -117,11 +117,13 @@ const Login: React.FC = () => {
       const [
         { data: totpData },
         { data: faceData },
-        { data: voiceData }
+        { data: voiceData },
+        { data: recoveryData }
       ] = await Promise.all([
         supabase.from('user_totp').select('user_id').eq('user_id', userId).maybeSingle(),
         supabase.from('user_facial_enrollments').select('user_id').eq('user_id', userId).maybeSingle(),
-        supabase.from('user_voice_passwords').select('user_id').eq('user_id', userId).maybeSingle()
+        supabase.from('user_voice_passwords').select('user_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('recovery_codes').select('user_id').eq('user_id', userId).eq('code_status', 'active').maybeSingle()
       ]);
 
       // Update available methods
@@ -129,7 +131,7 @@ const Login: React.FC = () => {
         totp: !!totpData,
         face: !!faceData,
         voice: !!voiceData,
-        recovery: true
+        recovery: !!recoveryData
       };
 
       setMfaState(prev => ({
@@ -138,7 +140,7 @@ const Login: React.FC = () => {
         currentUser: user
       }));
 
-      // Check which method to show first (priority order: totp > face > voice)
+      // Check which method to show first (priority order: totp > face > voice > recovery)
       if (totpData) {
         setMfaState(prev => ({
           ...prev,
@@ -156,6 +158,12 @@ const Login: React.FC = () => {
           ...prev,
           showVoiceModal: true,
           currentMethod: 'voice'
+        }));
+      } else if (recoveryData) {
+        setMfaState(prev => ({
+          ...prev,
+          showRecoveryModal: true,
+          currentMethod: 'recovery'
         }));
       } else {
         completeLogin();
@@ -212,6 +220,22 @@ const Login: React.FC = () => {
     }));
   };
 
+  const verifyRecoveryCode = async (code: string): Promise<boolean> => {
+    if (!mfaState.currentUser) return false;
+
+    try {
+      const { data, error } = await supabase.rpc('verify_recovery_code', {
+        user_id: mfaState.currentUser.id,
+        code: code
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Recovery code verification error:', error);
+      return false;
+    }
+  };
   return (
     <IonPage>
       <IonHeader>
@@ -334,14 +358,10 @@ const Login: React.FC = () => {
         <RecoveryCodeLoginModal
           isOpen={mfaState.showRecoveryModal}
           onClose={() => setMfaState(prev => ({ ...prev, showRecoveryModal: false }))}
-          onSubmit={async (code) => {
-            const { error } = await supabase.rpc('verify_recovery_code', {
-              user_id: mfaState.currentUser?.id,
-              code: code
-            });
-            return !error;
-          }}
+          onSubmit={verifyRecoveryCode}
+          onLoginSuccess={handleRecoveryCodeSuccess}
           onTryAnotherWay={showAlternativeMethods}
+          userId={mfaState.currentUser?.id}
         />
 
         <MfaActionSheet

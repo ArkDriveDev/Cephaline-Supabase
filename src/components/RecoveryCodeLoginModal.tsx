@@ -21,14 +21,18 @@ interface RecoveryCodeLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (code: string) => Promise<boolean>;
+  onLoginSuccess?: () => void;
   onTryAnotherWay?: () => void;
+  userId: string;
 }
 
 const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  onTryAnotherWay
+  onLoginSuccess,
+  onTryAnotherWay,
+  userId
 }) => {
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,35 +40,31 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  useEffect(() => {
-    if (!isOpen) {
-      // Reset state when modal closes
-      setCode('');
-      setError('');
-    }
-  }, [isOpen]);
-
   const handleSubmit = async () => {
-    setError('');
-    
     if (!code.trim()) {
       setError('Please enter a recovery code');
       return;
     }
 
     setIsSubmitting(true);
+    setError('');
+    
     try {
       const isValid = await onSubmit(code.trim());
-      if (!isValid) {
-        setError('Invalid recovery code. Please try again.');
+      if (isValid) {
+        setToastMessage('Login successful!');
+        setShowToast(true);
+        onLoginSuccess?.();
+      } else {
+        setError('Invalid recovery code');
         setToastMessage('Invalid recovery code');
         setShowToast(true);
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
-      setToastMessage('An error occurred. Please try again.');
+      setError('Verification failed');
+      setToastMessage('An error occurred');
       setShowToast(true);
-      console.error('Recovery code verification error:', err);
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }
@@ -75,6 +75,13 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
     setError('');
     onClose();
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCode('');
+      setError('');
+    }
+  }, [isOpen]);
 
   return (
     <IonModal isOpen={isOpen} onDidDismiss={handleDismiss}>
@@ -161,7 +168,7 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
           message={toastMessage}
           duration={1500}
           position="top"
-          color="danger"
+          color={toastMessage === 'Login successful!' ? 'success' : 'danger'}
         />
       </IonContent>
     </IonModal>
