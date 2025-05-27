@@ -259,7 +259,7 @@ const Login: React.FC = () => {
         }}>
           <IonCard className="fancy-card" style={{ width: '90%', maxWidth: '400px', padding: '2rem' }}>
             <IonCardContent>
-              <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>USER LOGIN</h2>
+              <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Cephaline LOGIN</h2>
 
               <IonInput
                 fill="outline"
