@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   IonModal,
   IonHeader,
@@ -16,12 +16,12 @@ import {
   IonToast,
 } from '@ionic/react';
 import { close } from 'ionicons/icons';
+import { supabase } from '../utils/supaBaseClient';
 
 interface RecoveryCodeLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (code: string) => Promise<boolean>;
-  onLoginSuccess?: () => void;
+  onLoginSuccess: () => void;
   onTryAnotherWay?: () => void;
   userId: string;
 }
@@ -29,7 +29,6 @@ interface RecoveryCodeLoginModalProps {
 const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   isOpen,
   onClose,
-  onSubmit,
   onLoginSuccess,
   onTryAnotherWay,
   userId
@@ -37,8 +36,46 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  const verifyRecoveryCode = async (rawCode: string): Promise<boolean> => {
+    if (!userId) {
+      setError('User not identified');
+      return false;
+    }
+
+    const cleanCode = rawCode.trim(); // Just trim whitespace, no hashing
+
+    try {
+      // Step 1: Check if code exists and is active
+      const { data: codeRecord, error: findError } = await supabase
+        .from('recovery_codes')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('code_hash', cleanCode) // Direct comparison
+        .eq('code_status', 'active')
+        .maybeSingle();
+
+      if (findError) throw findError;
+      if (!codeRecord) return false;
+
+      // Step 2: Mark code as used
+      const { error: updateError } = await supabase
+        .from('recovery_codes')
+        .update({
+          code_status: 'used',
+          used_at: new Date().toISOString()
+        })
+        .eq('user_id', codeRecord.user_id);
+
+      if (updateError) throw updateError;
+
+      return true;
+    } catch (err) {
+      console.error('Recovery code verification error:', err);
+      return false;
+    }
+  };
 
   const handleSubmit = async () => {
     if (!code.trim()) {
@@ -48,127 +85,92 @@ const RecoveryCodeLoginModal: React.FC<RecoveryCodeLoginModalProps> = ({
 
     setIsSubmitting(true);
     setError('');
-    
+
     try {
-      const isValid = await onSubmit(code.trim());
+      const isValid = await verifyRecoveryCode(code.trim());
+      
       if (isValid) {
-        setToastMessage('Login successful!');
-        setShowToast(true);
-        onLoginSuccess?.();
+        setShowSuccessToast(true);
+        setTimeout(() => {
+          onLoginSuccess();
+          onClose();
+        }, 1500);
       } else {
-        setError('Invalid recovery code');
-        setToastMessage('Invalid recovery code');
-        setShowToast(true);
+        setError('Invalid or already used recovery code');
       }
     } catch (err) {
-      setError('Verification failed');
-      setToastMessage('An error occurred');
-      setShowToast(true);
-      console.error(err);
+      setError('Verification failed. Please try again.');
+      console.error('Verification error:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDismiss = () => {
-    setCode('');
-    setError('');
-    onClose();
-  };
-
-  useEffect(() => {
-    if (!isOpen) {
-      setCode('');
-      setError('');
-    }
-  }, [isOpen]);
-
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={handleDismiss}>
+    <IonModal isOpen={isOpen} onDidDismiss={onClose}>
       <IonHeader>
         <IonToolbar>
           <IonTitle>Use Recovery Code</IonTitle>
-          <IonButton slot="end" fill="clear" onClick={handleDismiss}>
+          <IonButton slot="end" fill="clear" onClick={onClose}>
             <IonIcon icon={close} />
           </IonButton>
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
         <IonGrid>
-          <IonRow className="ion-justify-content-center">
-            <IonCol size="12" sizeMd="8">
+          <IonRow>
+            <IonCol>
               <IonText>
-                <p className="ion-text-center">
-                  Enter a recovery code to sign in. Each code can only be used once.
-                </p>
+                <p>Enter one of your recovery codes to authenticate.</p>
               </IonText>
-
-              <div className="ion-text-center" style={{ margin: '20px 0' }}>
-                <IonInput
-                  value={code}
-                  onIonChange={(e) => {
-                    const value = e.detail.value || '';
-                    setCode(value);
-                    setError('');
-                  }}
-                  placeholder="Enter your recovery code"
-                  autofocus
-                  clearOnEdit
-                  class={error ? 'ion-invalid' : ''}
-                  style={{
-                    fontSize: '18px',
-                    textAlign: 'center',
-                    border: error ? '2px solid var(--ion-color-danger)' : '1px solid var(--ion-color-medium)',
-                    borderRadius: '8px',
-                    padding: '10px',
-                    width: '100%',
-                    maxWidth: '400px',
-                    margin: '0 auto'
-                  }}
-                  disabled={isSubmitting}
-                />
-              </div>
-
+              
+              <IonInput
+                value={code}
+                onIonChange={(e) => setCode(e.detail.value || '')}
+                placeholder="e.g., 12345678"
+                className={error ? 'ion-invalid' : ''}
+                clearInput
+                disabled={isSubmitting}
+                inputMode="numeric" // Better for numeric codes
+              />
+              
               {error && (
-                <IonText color="danger">
-                  <p className="ion-text-center" style={{ fontSize: '14px' }}>{error}</p>
+                <IonText color="danger" className="ion-text-center">
+                  <p>{error}</p>
                 </IonText>
               )}
-            </IonCol>
-          </IonRow>
-
-          <IonRow className="ion-justify-content-center ion-margin-top">
-            <IonCol size="12" sizeMd="8">
-              <IonButton
-                expand="block"
-                onClick={handleSubmit}
-                disabled={isSubmitting || !code.trim()}
-              >
-                {isSubmitting ? <IonSpinner name="crescent" /> : 'Verify Code'}
-              </IonButton>
-
+              
+              <div className="ion-margin-top">
+                <IonButton
+                  expand="block"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !code.trim()}
+                >
+                  {isSubmitting ? <IonSpinner name="crescent" /> : 'Verify Code'}
+                </IonButton>
+              </div>
+              
               {onTryAnotherWay && (
                 <IonButton
                   fill="clear"
                   expand="block"
-                  color="dark"
                   onClick={onTryAnotherWay}
                   disabled={isSubmitting}
                 >
-                  Try another way
+                  Try Another Method
                 </IonButton>
               )}
             </IonCol>
           </IonRow>
         </IonGrid>
-
+        
         <IonToast
-          isOpen={showToast}
-          onDidDismiss={() => setShowToast(false)}
-          message={toastMessage}
+          isOpen={showSuccessToast}
+          onDidDismiss={() => setShowSuccessToast(false)}
+          message="Recovery code accepted!"
           duration={1500}
+          color="success"
           position="top"
-          color={toastMessage === 'Login successful!' ? 'success' : 'danger'}
         />
       </IonContent>
     </IonModal>

@@ -14,7 +14,7 @@ import {
   IonCardContent,
   IonLoading
 } from '@ionic/react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import TotpModal from '../components/TotpModal';
@@ -62,7 +62,7 @@ const Login: React.FC = () => {
       totp: false,
       face: false,
       voice: false,
-      recovery: true
+      recovery: false // Changed from true to false to reflect actual checks
     }
   });
 
@@ -89,8 +89,8 @@ const Login: React.FC = () => {
 
       if (error) throw error;
 
-      setMfaState({
-        ...mfaState,
+      setMfaState(prev => ({
+        ...prev,
         showTotpModal: false,
         showFaceModal: false,
         showVoiceModal: false,
@@ -99,7 +99,7 @@ const Login: React.FC = () => {
         currentUser: data.user,
         sessionFor2FA: data,
         currentMethod: null
-      });
+      }));
 
       await checkAuthFactors(data.user);
     } catch (error: any) {
@@ -123,16 +123,20 @@ const Login: React.FC = () => {
         supabase.from('user_totp').select('user_id').eq('user_id', userId).maybeSingle(),
         supabase.from('user_facial_enrollments').select('user_id').eq('user_id', userId).maybeSingle(),
         supabase.from('user_voice_passwords').select('user_id').eq('user_id', userId).maybeSingle(),
-        supabase.from('recovery_codes').select('user_id').eq('user_id', userId).eq('code_status', 'active').maybeSingle()
+        supabase.from('recovery_codes').select('*').eq('user_id', userId).eq('code_status', 'active')
       ]);
+
+      console.log('Recovery codes check:', recoveryData);
 
       // Update available methods
       const availableMethods = {
         totp: !!totpData,
         face: !!faceData,
         voice: !!voiceData,
-        recovery: !!recoveryData
+        recovery: !!recoveryData && recoveryData.length > 0
       };
+
+      console.log('Available methods:', availableMethods);
 
       setMfaState(prev => ({
         ...prev,
@@ -159,7 +163,7 @@ const Login: React.FC = () => {
           showVoiceModal: true,
           currentMethod: 'voice'
         }));
-      } else if (recoveryData) {
+      } else if (availableMethods.recovery) {
         setMfaState(prev => ({
           ...prev,
           showRecoveryModal: true,
@@ -198,6 +202,7 @@ const Login: React.FC = () => {
   };
 
   const showAlternativeMethods = () => {
+    console.log('Showing alternative methods', mfaState.availableMethods);
     setMfaState(prev => ({
       ...prev,
       showTotpModal: false,
@@ -236,6 +241,7 @@ const Login: React.FC = () => {
       return false;
     }
   };
+
   return (
     <IonPage>
       <IonHeader>
@@ -317,7 +323,15 @@ const Login: React.FC = () => {
               >
                 Forgot Password?
               </IonButton>
-              <AlertBox message={alertMessage} isOpen={showAlert} onClose={() => setShowAlert(false)} />
+
+              <IonAlert
+                isOpen={showAlert}
+                onDidDismiss={() => setShowAlert(false)}
+                header="Notification"
+                message={alertMessage}
+                buttons={['OK']}
+              />
+
               <IonToast
                 isOpen={showToast}
                 onDidDismiss={() => setShowToast(false)}
@@ -355,13 +369,14 @@ const Login: React.FC = () => {
           onTryAnotherWay={showAlternativeMethods}
         />
 
+       // In your Login component, update the RecoveryCodeLoginModal usage to:
+
         <RecoveryCodeLoginModal
           isOpen={mfaState.showRecoveryModal}
           onClose={() => setMfaState(prev => ({ ...prev, showRecoveryModal: false }))}
-          onSubmit={verifyRecoveryCode}
           onLoginSuccess={handleRecoveryCodeSuccess}
           onTryAnotherWay={showAlternativeMethods}
-          userId={mfaState.currentUser?.id}
+          userId={mfaState.currentUser?.id ?? ''}
         />
 
         <MfaActionSheet
@@ -375,22 +390,6 @@ const Login: React.FC = () => {
         <IonLoading isOpen={isLoading} message="Authenticating..." />
       </IonContent>
     </IonPage>
-  );
-};
-
-const AlertBox: React.FC<{ message: string; isOpen: boolean; onClose: () => void }> = ({
-  message,
-  isOpen,
-  onClose,
-}) => {
-  return (
-    <IonAlert
-      isOpen={isOpen}
-      onDidDismiss={onClose}
-      header="Notification"
-      message={message}
-      buttons={['OK']}
-    />
   );
 };
 
