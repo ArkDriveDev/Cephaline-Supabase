@@ -27,8 +27,6 @@ import Menu from './pages/Menu';
 import ForgotPass from './pages/ForgotPass';
 import ChangePass from './pages/Changepass';
 
-
-
 setupIonicReact();
 
 const App: React.FC = () => (
