@@ -26,7 +26,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   onToggleChange,
   disabled
 }) => {
-  const [enabled, setEnabled] = useState(initialEnabled);
+  const [enabled, setEnabled] = useState(false);
   const [voicePassword, setVoicePassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -37,34 +37,50 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    const checkAuthAndPassword = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await checkExistingVoicePassword();
+    let isMounted = true;
+    const initializeComponent = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!isMounted) return;
+
+        if (user) {
+          await checkExistingVoicePassword();
+        }
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
       }
-      setIsInitializing(false);
     };
 
-    checkAuthAndPassword();
+    initializeComponent();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (!isMounted) return;
+      
       if (event === 'SIGNED_IN') {
         await checkExistingVoicePassword();
       } else if (event === 'SIGNED_OUT') {
         setEnabled(false);
         setHasExistingPassword(false);
         setVoicePassword('');
+        onToggleChange(false);
       }
     });
 
     return () => {
+      isMounted = false;
       subscription?.unsubscribe();
     };
   }, []);
 
   useEffect(() => {
-    setEnabled(initialEnabled);
-  }, [initialEnabled]);
+    if (!isInitializing) {
+      setEnabled(initialEnabled);
+    }
+  }, [initialEnabled, isInitializing]);
 
   const checkExistingVoicePassword = async () => {
     try {
@@ -72,7 +88,6 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
-        console.log('No authenticated user');
         setEnabled(false);
         setHasExistingPassword(false);
         return;
@@ -85,19 +100,17 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
         .maybeSingle();
 
       if (error || !voicePasswordData) {
-        console.log('No existing voice password found');
         setEnabled(false);
         setHasExistingPassword(false);
         return;
       }
 
-      // We don't decrypt the password here, we just check if it exists
-      setVoicePassword(''); // Clear the plain text password
+      setVoicePassword('');
       setHasExistingPassword(true);
       setEnabled(true);
       onToggleChange(true);
     } catch (error) {
-      console.error('Error checking for voice password:', error);
+      console.error('Error checking voice password:', error);
       setEnabled(false);
       setHasExistingPassword(false);
     } finally {
@@ -119,16 +132,13 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     const upperCasePassword = voicePassword.trim().toUpperCase();
     
     if (!upperCasePassword) {
-      setToastMessage('Please enter a voice password');
-      setToastColor('warning');
-      setShowToast(true);
+      showToastMessage('Please enter a voice password', 'warning');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Hash the password with bcrypt
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(upperCasePassword, salt);
 
@@ -146,21 +156,18 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
       if (error) throw error;
 
-      setToastMessage('Voice password saved successfully');
-      setToastColor('success');
-      setVoicePassword(''); // Clear the plain text password after hashing
+      showToastMessage('Voice password saved successfully', 'success');
+      setVoicePassword('');
       setEnabled(true);
       setHasExistingPassword(true);
       onToggleChange(true);
     } catch (error) {
       console.error('Error saving voice password:', error);
-      setToastMessage('Failed to save voice password');
-      setToastColor('danger');
+      showToastMessage('Failed to save voice password', 'danger');
       setEnabled(false);
       onToggleChange(false);
     } finally {
       setIsProcessing(false);
-      setShowToast(true);
     }
   };
 
@@ -179,17 +186,19 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       setEnabled(false);
       setHasExistingPassword(false);
       onToggleChange(false);
-      setToastMessage('Voice password removed');
-      setToastColor('success');
-      setShowToast(true);
+      showToastMessage('Voice password removed', 'success');
     } catch (error) {
       console.error('Error removing voice password:', error);
-      setToastMessage('Failed to remove voice password');
-      setToastColor('danger');
-      setShowToast(true);
+      showToastMessage('Failed to remove voice password', 'danger');
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const showToastMessage = (message: string, color: 'success' | 'warning' | 'danger') => {
+    setToastMessage(message);
+    setToastColor(color);
+    setShowToast(true);
   };
 
   if (isInitializing) {
