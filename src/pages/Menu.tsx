@@ -58,7 +58,7 @@ const Menu: React.FC = () => {
       if (error) throw error;
       
       // Redirect to login page after successful logout
-      history.push('/Cephaline-Supabase');
+      history.push('/');
     } catch (error) {
       console.error('Error logging out:', error);
     }
