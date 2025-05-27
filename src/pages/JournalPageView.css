@@ -1,0 +1,257 @@
+/* JournalPageView.css */
+.journal-page-content {
+  --background: #e9f0f9; /* Parchment-like background */
+  --ion-safe-area-top: 20px;
+  --ion-safe-area-bottom: 20px;
+}
+
+.journal-page-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: white;
+  box-shadow: 0 0 15px rgba(0,0,0,0.08);
+  min-height: calc(100% - 40px);
+  position: relative;
+  
+  /* Paper texture with subtle grain */
+  background-image: 
+    linear-gradient(#e9f4f9 0.1em, transparent 0.1em),
+    radial-gradient(#c5ced4 1px, transparent 1px);
+  background-size: 
+    100% 1.2em,
+    10px 10px;
+  line-height: 1.5em;
+  padding: 2em;
+}
+
+.journal-page-header {
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding-bottom: 1em;
+  margin-bottom: 1.5em;
+  position: relative;
+}
+
+.journal-page-header h1 {
+  font-size: 1.8rem;
+  margin: 0 0 0.5em 0;
+  color: #333;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+/* Mood display styles */
+.mood-display {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.5em 0;
+  background-color: rgba(25, 118, 210, 0.1);
+  border-radius: 16px;
+  padding: 4px 12px;
+}
+
+.mood-display ion-icon {
+  margin-right: 6px;
+  color: var(--ion-color-primary);
+  font-size: 1.1em;
+}
+
+.mood-display ion-badge {
+  --background: transparent;
+  --color: #1976d2;
+  --padding-start: 0;
+  --padding-end: 0;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.page-metadata {
+  margin-top: 0.5em;
+  color: #666;
+  font-size: 0.9rem;
+  display: flex;
+  gap: 1em;
+}
+
+.page-metadata small {
+  display: flex;
+  align-items: center;
+}
+
+.journal-page-text {
+  line-height: 1.7;
+  font-size: 1.1rem;
+  padding: 1em 0;
+  color: #333;
+}
+
+.journal-page-text p {
+  margin: 0 0 1.2em 0;
+}
+
+.empty-content {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  padding: 2em 0;
+}
+
+/* Contents section */
+.contents-section {
+  margin: 2em 0;
+  padding-top: 1em;
+  border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.contents-title {
+  display: flex;
+  align-items: center;
+  font-size: 1.3rem;
+  margin-bottom: 1em;
+  color: #333;
+}
+
+.empty-contents {
+  text-align: center;
+  padding: 2em;
+  color: #666;
+}
+
+/* Content items */
+.content-item {
+  margin-bottom: 1.5em;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: white;
+}
+
+.content-item ion-card-content {
+  padding: 1em;
+}
+
+.content-paragraph {
+  margin: 1em 0;
+  white-space: pre-line;
+}
+
+.content-image {
+  margin: 1em 0;
+  text-align: center;
+}
+
+.content-meta {
+  display: block;
+  margin-top: 0.8em;
+  font-size: 0.8em;
+  color: #666;
+}
+
+/* Navigation */
+.page-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3em;
+  padding-top: 1.5em;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+.page-navigation ion-button {
+  --padding-start: 0.8em;
+  --padding-end: 0.8em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .journal-page-container {
+    padding: 1.5em;
+    margin: 0 1em;
+    width: auto;
+  }
+  
+  .journal-page-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .journal-page-text {
+    font-size: 1rem;
+  }
+}
+
+/* Interactive elements */
+ion-button {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+ion-button:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+}
+
+/* Slide Animation */
+.slide-container {
+  position: relative;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.slide-left .journal-page-container {
+  animation: slideOutLeft 0.3s forwards;
+}
+
+.slide-right .journal-page-container {
+  animation: slideOutRight 0.3s forwards;
+}
+
+@keyframes slideOutLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideOutRight {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* For the incoming page (handled by Ionic's router) */
+ion-router-outlet > .ion-page {
+  animation: slideIn 0.3s forwards;
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* For previous page navigation */
+ion-router-outlet > .ion-page.slide-back {
+  animation: slideInFromLeft 0.3s forwards;
+}
+
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

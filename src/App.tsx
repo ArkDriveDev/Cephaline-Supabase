@@ -1,16 +1,14 @@
-import { Redirect, Route } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import { Route } from 'react-router-dom';
 
-/* Core CSS required for Ionic components to work properly */
+/* Core CSS imports */
 import '@ionic/react/css/core.css';
-
-/* Basic CSS for apps built with Ionic */
 import '@ionic/react/css/normalize.css';
 import '@ionic/react/css/structure.css';
 import '@ionic/react/css/typography.css';
 
-/* Optional CSS utils that can be commented out */
+/* Optional CSS imports */
 import '@ionic/react/css/padding.css';
 import '@ionic/react/css/float-elements.css';
 import '@ionic/react/css/text-alignment.css';
@@ -18,31 +16,31 @@ import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
-/**
- * Ionic Dark Mode
- * -----------------------------------------------------
- * For more info, please see:
- * https://ionicframework.com/docs/theming/dark-mode
- */
-
-/* import '@ionic/react/css/palettes/dark.always.css'; */
-/* import '@ionic/react/css/palettes/dark.class.css'; */
+/* Theme imports */
 import '@ionic/react/css/palettes/dark.system.css';
-
-/* Theme variables */
 import './theme/variables.css';
+
+/* Page imports */
 import Login from './pages/Login';
 import Registration from './pages/Register';
+import ChangePass from './pages/Changepass';
+import Menu from './pages/Menu';
+import ForgotPass from './pages/ForgotPass';
+
+
 
 setupIonicReact();
 
 const App: React.FC = () => (
   <IonApp>
     <IonReactRouter>
-      <IonRouterOutlet>
-        <Route exact path="/cephaline-supabase" component={Login} />
-        <Route exact path="/cephaline-supabase/registration" component={Registration} />
-      </IonRouterOutlet>
+        <IonRouterOutlet>
+          <Route exact path="/" component={Login} />
+          <Route exact path="/registration" component={Registration} />
+          <Route exact path="/forgotpass" component={ForgotPass} />
+          <Route exact path="/changepassword" component={ChangePass} />
+          <Route path="/app" component={Menu} />
+        </IonRouterOutlet>
     </IonReactRouter>
   </IonApp>
 );
