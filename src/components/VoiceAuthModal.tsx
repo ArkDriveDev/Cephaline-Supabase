@@ -13,6 +13,7 @@ import {
 import { mic, checkmarkCircle, closeCircle, close } from 'ionicons/icons';
 import { supabase } from '../utils/supaBaseClient';
 import { voiceAuthService } from '../services/voice-auth.service';
+import * as bcrypt from 'bcryptjs';
 
 interface VoiceAuthModalProps {
   isOpen: boolean;
@@ -21,6 +22,9 @@ interface VoiceAuthModalProps {
   userId: string;
   onTryAnotherWay: () => void;
 }
+
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_TIME = 30000; // 30 seconds
 
 const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
   isOpen,
@@ -31,21 +35,41 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
 }) => {
   const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'success' | 'error' | 'unsupported'>('idle');
   const [error, setError] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState(MAX_ATTEMPTS);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
 
   useEffect(() => {
     if (!voiceAuthService.isBrowserSupported()) {
       setStatus('unsupported');
     }
-    
+
     return () => {
       voiceAuthService.stop();
     };
   }, []);
 
-  const handleListenStart = () => {
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isLockedOut && lockoutTimer > 0) {
+      interval = setInterval(() => {
+        setLockoutTimer(prev => prev - 1000);
+      }, 1000);
+    } else if (lockoutTimer <= 0 && isLockedOut) {
+      setIsLockedOut(false);
+      setAttemptsRemaining(MAX_ATTEMPTS);
+    }
+    return () => clearInterval(interval);
+  }, [isLockedOut, lockoutTimer]);
+
+  const handleListenStart = async () => {
     if (!voiceAuthService.isBrowserSupported()) {
       setStatus('unsupported');
+      return;
+    }
+
+    if (isLockedOut) {
+      setError(`Too many attempts. Try again in ${lockoutTimer / 1000} seconds`);
       return;
     }
 
@@ -56,9 +80,10 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
       async (spokenText) => {
         setStatus('processing');
         try {
+          // Fetch the stored hash
           const { data, error: supabaseError } = await supabase
             .from('user_voice_passwords')
-            .select('password')
+            .select('password, failed_attempts')
             .eq('user_id', userId)
             .single();
 
@@ -66,17 +91,42 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
             throw new Error('Voice authentication not set up');
           }
 
-          // Compare both in uppercase
-          if (data.password.toUpperCase().trim() === spokenText.toUpperCase().trim()) {
+          // Compare using bcrypt
+          const isMatch = await bcrypt.compare(spokenText, data.password);
+
+          if (isMatch) {
+            // Reset attempts on success
             await supabase
               .from('user_voice_passwords')
-              .update({ last_used_at: new Date().toISOString() })
+              .update({
+                last_used_at: new Date().toISOString(),
+                failed_attempts: 0
+              })
               .eq('user_id', userId);
 
             setStatus('success');
             setTimeout(() => onAuthSuccess(), 1000);
           } else {
-            throw new Error('Voice authentication failed');
+            // Increment failed attempts
+            const newAttempts = (data.failed_attempts || 0) + 1;
+            await supabase
+              .from('user_voice_passwords')
+              .update({
+                failed_attempts: newAttempts,
+                last_failed_attempt: new Date().toISOString()
+              })
+              .eq('user_id', userId);
+
+            const remaining = MAX_ATTEMPTS - newAttempts;
+            setAttemptsRemaining(remaining);
+
+            if (remaining <= 0) {
+              setIsLockedOut(true);
+              setLockoutTimer(LOCKOUT_TIME);
+              throw new Error('Too many attempts. Try again later.');
+            } else {
+              throw new Error(`Verification failed. ${remaining} attempt(s) remaining.`);
+            }
           }
         } catch (err) {
           setStatus('error');
@@ -96,15 +146,11 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
   };
 
   const handleRetry = () => {
-    if (retryCount < 2) {
-      setRetryCount(prev => prev + 1);
+    if (attemptsRemaining > 0 && !isLockedOut) {
       setStatus('idle');
       setError('');
-    } else {
-      onDidDismiss();
     }
   };
-
   if (status === 'unsupported') {
     return (
       <IonModal isOpen={isOpen} onDidDismiss={onDidDismiss}>
@@ -178,9 +224,12 @@ const VoiceAuthModal: React.FC<VoiceAuthModalProps> = ({
             {status === 'error' && (
               <div className="ion-text-center">
                 <IonIcon icon={closeCircle} color="danger" size="large" />
-                <p>{error || 'Verification failed'}</p>
-                {retryCount < 2 && (
-                  <p>{2 - retryCount} attempts remaining</p>
+                <p>{error}</p>
+                {!isLockedOut && attemptsRemaining > 0 && (
+                  <p>{attemptsRemaining} attempt(s) remaining</p>
+                )}
+                {isLockedOut && (
+                  <p>Try again in {Math.ceil(lockoutTimer / 1000)} seconds</p>
                 )}
               </div>
             )}
