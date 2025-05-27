@@ -27,8 +27,8 @@ const Menu: React.FC = () => {
   const history = useHistory();
 
   const path = [
-    { name: 'Home', url: '/Cephaline-Supabase/app/home', icon: homeOutline },
-    { name: 'Profile', url: '/Cephaline-Supabase/app/editProfile', icon: personCircleOutline },
+    { name: 'Home', url: '/app/home', icon: homeOutline },
+    { name: 'Profile', url: '/app/editProfile', icon: personCircleOutline },
   ]
 
   const glow = {
@@ -106,18 +106,18 @@ const Menu: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonRouterOutlet id="main">
-          <Route exact path="/Cephaline-Supabase/app/home" component={Home} />
-          <Route exact path="/Cephaline-Supabase/app/editProfile" component={EditProfile} />
-          <Route exact path="/Cephaline-Supabase/app/JournalPage/:journalId?" component={JournalPage} />
-          <Route exact path="/Cephaline-Supabase/app/page-list/:journalId" component={PageList} />
-          <Route exact path="/Cephaline-Supabase/app/JournalPageView/:journalId/:pageId" component={JournalPageView} />
+          <Route exact path="/app/home" component={Home} />
+          <Route exact path="/app/editProfile" component={EditProfile} />
+          <Route exact path="/app/JournalPage/:journalId?" component={JournalPage} />
+          <Route exact path="/app/page-list/:journalId" component={PageList} />
+          <Route exact path="/app/JournalPageView/:journalId/:pageId" component={JournalPageView} />
           <Route
             exact
-            path="/Cephaline-Supabase/app/Overviewing/:journalId"
+            path="/app/Overviewing/:journalId"
             component={Overviewing}
           />
-          <Route exact path="/Cephaline-Supabase/app">
-            <Redirect to="/Cephaline-Supabase/app/home" />
+          <Route exact path="/app">
+            <Redirect to="/app/home" />
           </Route>
         </IonRouterOutlet>
       </IonPage>

@@ -66,7 +66,7 @@ const ChangePass: React.FC = () => {
     } catch (error: any) {
       setAlertMessage("Invalid or expired reset link. Please request a new one.");
       setShowAlert(true);
-      navigation.push('/Cephaline-Supabase', 'root', 'replace');
+      navigation.push('/', 'root', 'replace');
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +134,7 @@ const ChangePass: React.FC = () => {
       setShowAlert(true);
 
       await supabase.auth.signOut();
-      navigation.push('/Cephaline-Supabase', 'root', 'replace');
+      navigation.push('/', 'root', 'replace');
     } catch (error: any) {
       setAlertMessage(error.message || "Password update failed. Please try again.");
       setShowAlert(true);
@@ -297,7 +297,7 @@ const ChangePass: React.FC = () => {
           </div>
 
           <IonButton
-            routerLink="/Cephaline-Supabase"
+            routerLink="/"
             fill="clear"
             style={{
               color: '#3880ff',

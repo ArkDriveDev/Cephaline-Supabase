@@ -69,7 +69,7 @@ const Login: React.FC = () => {
   const completeLogin = () => {
     setShowToast(true);
     setTimeout(() => {
-      navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+      navigation.push('/app', 'forward', 'replace');
     }, 300);
   };
 
@@ -273,14 +273,14 @@ const Login: React.FC = () => {
               <IonButton
                 fill="clear"
                 expand="block"
-                routerLink="/Cephaline-Supabase/Registration"
+                routerLink="/Registration"
                 color="primary"
                 disabled={isLoading}
               >
                 Don't have an account? Register here
               </IonButton>
               <IonButton
-                routerLink="/Cephaline-Supabase/forgotpassword"
+                routerLink="/forgotpassword"
                 expand="full"
                 fill="clear"
                 style={{

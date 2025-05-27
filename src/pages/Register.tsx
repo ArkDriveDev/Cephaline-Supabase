@@ -83,12 +83,6 @@ const Register: React.FC = () => {
   };
 
   const handleOpenVerificationModal = () => {
-    if (!email.endsWith('@nbsc.edu.ph')) {
-      setAlertMessage('Only @nbsc.edu.ph emails are allowed to register.');
-      setShowAlert(true);
-      return;
-    }
-
     if (password !== confirmPassword) {
       setAlertMessage('Passwords do not match.');
       setShowAlert(true);
@@ -295,7 +289,7 @@ const Register: React.FC = () => {
             </IonButton>
 
             <IonButton
-              routerLink="/Cephaline-Supabase"
+              routerLink="/"
               expand="block"
               fill="clear"
               shape="round"

@@ -224,7 +224,7 @@ const JournalPage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-    navigation.push('/Cephaline-Supabase/app', 'forward', 'replace');
+    navigation.push('/app', 'forward', 'replace');
   };
 
   const handleDeleteJournal = async () => {
@@ -311,7 +311,7 @@ const JournalPage: React.FC = () => {
             {/* YOUR EXACT BUTTON LAYOUT PRESERVED */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%'}}>
               <IonButtons slot="start">
-                <IonBackButton defaultHref="/Cephaline-Supabase/app/home" />
+                <IonBackButton defaultHref="/app/home" />
               </IonButtons>
               <IonButtons slot="end">
                 <IonButton color="danger" onClick={() => setShowDeleteAlert(true)}>

@@ -87,7 +87,7 @@ const Overviewing: React.FC = () => {
 
   const handleBookClick = () => {
     if (firstPageId) {
-      router.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${firstPageId}`);
+      router.push(`/app/JournalPageView/${journalId}/${firstPageId}`);
     } else {
       setToastMessage('This journal has no pages yet');
       setShowToast(true);

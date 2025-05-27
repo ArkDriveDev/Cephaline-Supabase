@@ -38,7 +38,7 @@ const ForgotPass: React.FC = () => {
 
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/Cephaline-Supabase/changepassword`,
+                redirectTo: `${window.location.origin}/changepass`,
             });
 
             if (error) throw error;

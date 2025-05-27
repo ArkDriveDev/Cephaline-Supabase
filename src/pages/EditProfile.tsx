@@ -41,7 +41,7 @@ const EditProfile: React.FC = () => {
           console.error('No valid session found:', sessionError);
           setAlertMessage('You must be logged in to access this page.');
           setShowAlert(true);
-          history.push('/Cephaline-Supabase/login');
+          history.push('/login');
           return;
         }
 
@@ -212,7 +212,7 @@ const EditProfile: React.FC = () => {
         console.error('No valid session found');
         setAlertMessage('Session expired. Please log in again.');
         setShowAlert(true);
-        history.push('/Cephaline-Supabase/login');
+        history.push('/login');
         return;
       }
 
@@ -297,7 +297,7 @@ const EditProfile: React.FC = () => {
       setShowAlert(true);
       setTimeout(() => {
         console.log('Navigating back to app...');
-        history.push('/Cephaline-Supabase/app');
+        history.push('/app');
       }, 1500);
     } catch (error) {
       console.error('Update error:', error);
@@ -313,7 +313,7 @@ const EditProfile: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonButtons slot="start">
-          <IonBackButton defaultHref="/Cephaline-Supabase/app" />
+          <IonBackButton defaultHref="/app" />
         </IonButtons>
       </IonHeader>
       <IonContent className="ion-padding">

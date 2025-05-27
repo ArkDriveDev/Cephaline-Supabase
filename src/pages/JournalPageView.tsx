@@ -150,11 +150,11 @@ const JournalPageView: React.FC = () => {
   };
 
   const handleEdit = () => {
-    history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}`);
+    history.push(`/app/JournalPage/${journalId}/${pageId}`);
   };
 
   const handleAddContent = () => {
-    history.push(`/Cephaline-Supabase/app/JournalPage/${journalId}/${pageId}/content`);
+    history.push(`/app/JournalPage/${journalId}/${pageId}/content`);
   };
 
   interface ContentEntry {
@@ -295,7 +295,7 @@ const JournalPageView: React.FC = () => {
     setSlideDirection(direction === 'prev' ? 'right' : 'left');
 
     setTimeout(() => {
-      history.push(`/cephaline-supabase/app/JournalPageView/${journalId}/${targetPageId}`);
+      history.push(`/app/JournalPageView/${journalId}/${targetPageId}`);
       setIsAnimating(false);
       setSlideDirection(null);
     }, 300);
@@ -382,7 +382,7 @@ const JournalPageView: React.FC = () => {
         <IonHeader>
           <IonToolbar>
             <IonButtons slot="start">
-              <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} />
+              <IonBackButton defaultHref={`/app/Overviewing/${journalId}`} />
             </IonButtons>
             <IonTitle>Page Not Found</IonTitle>
           </IonToolbar>
@@ -414,7 +414,7 @@ const JournalPageView: React.FC = () => {
         <div className={`slide-container ${slideDirection ? 'slide-' + slideDirection : ''}`}>
           <div className="journal-page-container">
             <IonButtons slot="start">
-              <IonBackButton defaultHref={`/cephaline-supabase/app/Overviewing/${journalId}`} style={{ color: 'skyblue' }} />
+              <IonBackButton defaultHref={`/app/Overviewing/${journalId}`} style={{ color: 'skyblue' }} />
             </IonButtons>
 
             <div className="journal-page-header">

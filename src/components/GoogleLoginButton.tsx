@@ -13,7 +13,7 @@ const GoogleLoginButton = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/Cephaline-Supabase/app'
+          redirectTo: window.location.origin + '/app'
         }
       });
 
@@ -30,7 +30,7 @@ const GoogleLoginButton = () => {
       });
 
       // Redirect after successful login
-      router.push('/Cephaline-Supabase/app', 'forward', 'replace');
+      router.push('/app', 'forward', 'replace');
 
     } catch (error: any) {
       await presentToast({
