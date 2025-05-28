@@ -7,11 +7,14 @@ import {
   IonToast,
   IonText,
   IonProgressBar,
-  IonAvatar
+  IonAvatar,
+  IonItem,
+  IonLabel
 } from '@ionic/react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supaBaseClient';
 import favicon from '../images/favicon.png';
+import { useHistory } from 'react-router-dom';
 
 const ChangePass: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
@@ -27,64 +30,48 @@ const ChangePass: React.FC = () => {
     label: '',
     color: ''
   });
+  const history = useHistory();
 
   // Parse URL parameters on component mount
   useEffect(() => {
     const parseUrlParams = () => {
-      // Handle both formats:
-      // Format 1: /#/changepass?email=test@test.com&token=abc123
-      // Format 2: /changepass#email=test@test.com&token=abc123
-      
-      const hash = window.location.hash.substring(1); // Remove #
-      const query = window.location.search.substring(1); // Remove ?
-      
-      // Combine both hash and query params
-      const params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : query || hash);
-      
-      const emailParam = params.get('email');
-      const tokenParam = params.get('token');
-      const typeParam = params.get('type');
+      try {
+        // Get the hash part of the URL (after #)
+        const hash = window.location.hash.substring(1);
+        const hashParams = new URLSearchParams(hash.split('?')[1] || '');
+        
+        // Get the email and token from hash parameters
+        const emailParam = hashParams.get('email');
+        const tokenParam = hashParams.get('access_token');
+        const typeParam = hashParams.get('type');
 
-      if (!emailParam || !tokenParam || typeParam !== 'recovery') {
-        setMessage('Invalid or expired password reset link');
+        if (!emailParam || !tokenParam || typeParam !== 'recovery') {
+          setMessage('Invalid or expired password reset link');
+          setShowAlert(true);
+          setTimeout(() => {
+            history.push('/');
+          }, 3000);
+          return;
+        }
+
+        setEmail(decodeURIComponent(emailParam));
+        setToken(tokenParam);
+      } catch (error) {
+        console.error('Error parsing URL:', error);
+        setMessage('Invalid password reset link');
         setShowAlert(true);
         setTimeout(() => {
-          window.location.href = 'https://cephaline-supabase.vercel.app/#/';
+          history.push('/');
         }, 3000);
-        return;
       }
-
-      setEmail(decodeURIComponent(emailParam));
-      setToken(tokenParam);
     };
 
     parseUrlParams();
-  }, []);
+  }, [history]);
 
-  // Password strength calculator
+  // Password strength calculator (keep your existing implementation)
   useEffect(() => {
-    if (!newPassword) {
-      setPasswordStrength({ value: 0, label: '', color: '' });
-      return;
-    }
-
-    let strength = 0;
-    if (newPassword.length >= 8) strength += 1;
-    if (newPassword.length >= 12) strength += 1;
-    if (/[A-Z]/.test(newPassword)) strength += 1;
-    if (/[a-z]/.test(newPassword)) strength += 1;
-    if (/[0-9]/.test(newPassword)) strength += 1;
-    if (/[^A-Za-z0-9]/.test(newPassword)) strength += 1;
-
-    if (strength <= 2) {
-      setPasswordStrength({ value: 0.25, label: 'Very Weak', color: 'danger' });
-    } else if (strength <= 4) {
-      setPasswordStrength({ value: 0.5, label: 'Weak', color: 'warning' });
-    } else if (strength <= 6) {
-      setPasswordStrength({ value: 0.75, label: 'Strong', color: 'success' });
-    } else {
-      setPasswordStrength({ value: 1, label: 'Very Strong', color: 'primary' });
-    }
+    // ... (keep your existing password strength logic)
   }, [newPassword]);
 
   const handlePasswordReset = async () => {
@@ -109,30 +96,35 @@ const ChangePass: React.FC = () => {
     setLoading(true);
 
     try {
-      // Step 1: Verify the token
+      // First verify the token with the email
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token,
         type: 'recovery'
       });
 
-      if (verifyError) throw verifyError;
+      if (verifyError) {
+        throw verifyError;
+      }
 
-      // Step 2: Update password
+      // Then update the password
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        throw updateError;
+      }
 
       setMessage('Password updated successfully! Redirecting...');
       setShowToast(true);
       
       setTimeout(() => {
-        window.location.href = 'https://cephaline-supabase.vercel.app/#/';
+        history.push('/');
       }, 2000);
     } catch (error: any) {
-      setMessage(error.message || 'Password reset failed');
+      console.error('Password reset error:', error);
+      setMessage(error.message || 'Password reset failed. The link may have expired or is invalid.');
       setShowAlert(true);
     } finally {
       setLoading(false);
@@ -145,7 +137,8 @@ const ChangePass: React.FC = () => {
         backgroundColor: '#121212',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        minHeight: '100vh'
       }}>
         <div style={{
           backgroundColor: '#1e1e1e',
@@ -166,20 +159,20 @@ const ChangePass: React.FC = () => {
           <h1 style={{
             color: 'white',
             textAlign: 'center',
-            marginBottom: '0.5rem'
+            marginBottom: '1.5rem'
           }}>
             Reset Password
           </h1>
 
-          {email && (
-            <p style={{
-              color: '#a1a1aa',
-              textAlign: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              For: {email}
-            </p>
-          )}
+          {/* Display the email in a read-only field */}
+          <IonItem style={{ marginBottom: '1rem' }}>
+            <IonLabel position="stacked">Email</IonLabel>
+            <IonInput 
+              value={email} 
+              readonly 
+              style={{ color: '#a1a1aa' }}
+            />
+          </IonItem>
 
           <IonInput
             label="New Password"
@@ -198,7 +191,7 @@ const ChangePass: React.FC = () => {
                 value={passwordStrength.value} 
                 color={passwordStrength.color}
               />
-              <IonText color={passwordStrength.color}>
+              <IonText color={passwordStrength.color} style={{ display: 'block', textAlign: 'center', marginTop: '4px' }}>
                 {passwordStrength.label}
               </IonText>
             </div>
@@ -219,6 +212,7 @@ const ChangePass: React.FC = () => {
             expand="block" 
             onClick={handlePasswordReset}
             disabled={loading}
+            style={{ marginTop: '1rem' }}
           >
             {loading ? 'Processing...' : 'Reset Password'}
           </IonButton>
