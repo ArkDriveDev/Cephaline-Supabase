@@ -303,14 +303,14 @@ const Login: React.FC = () => {
               <IonButton
                 fill="clear"
                 expand="block"
-                routerLink="/#/Registration"
+                routerLink="/Registration"
                 color="primary"
                 disabled={isLoading}
               >
                 Don't have an account? Register here
               </IonButton>
               <IonButton
-                routerLink="/#/forgotpass"
+                routerLink="/forgotpass"
                 expand="full"
                 fill="clear"
                 style={{
