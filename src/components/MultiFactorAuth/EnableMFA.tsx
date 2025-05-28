@@ -178,7 +178,7 @@ useEffect(() => {
 
       // Delete TOTP codes
       const { error: totpError } = await supabase
-        .from('totp_codes')
+        .from('user_totp')
         .delete()
         .eq('user_id', user.id);
 
@@ -416,11 +416,7 @@ useEffect(() => {
               disabled={false}
             />
 
-            <VoicePasswordToggle
-              initialEnabled={activeMFAMethod === 'voice'}
-              onToggleChange={handleVoiceToggleChange}
-              disabled={false}
-            />
+  
 
             <h1>................</h1>
           </div>
