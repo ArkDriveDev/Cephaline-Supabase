@@ -1,6 +1,6 @@
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
-import { HashRouter as Router } from 'react-router-dom';
-import { Route, Redirect } from 'react-router-dom';
+import { HashRouter as Router, Route, Redirect, useHistory } from 'react-router-dom';
+import { IonReactHashRouter } from '@ionic/react-router';
 
 /* Core CSS imports */
 import '@ionic/react/css/core.css';
@@ -31,7 +31,7 @@ setupIonicReact();
 
 const App: React.FC = () => (
   <IonApp>
-    <Router>
+    <IonReactHashRouter>
       <IonRouterOutlet>
         <Route exact path="/" component={Login} />
         <Route exact path="/registration" component={Registration} />
@@ -40,7 +40,7 @@ const App: React.FC = () => (
         <Route path="/app" component={Menu} />
         <Redirect to="/" />
       </IonRouterOutlet>
-    </Router>
+    </IonReactHashRouter>
   </IonApp>
 );
 
