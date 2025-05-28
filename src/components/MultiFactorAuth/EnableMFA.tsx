@@ -416,7 +416,12 @@ useEffect(() => {
               disabled={false}
             />
 
-  
+
+            <VoicePasswordToggle
+              initialEnabled={activeMFAMethod === 'voice'}
+              onToggleChange={handleVoiceToggleChange}
+              disabled={false}
+            />
 
             <h1>................</h1>
           </div>
