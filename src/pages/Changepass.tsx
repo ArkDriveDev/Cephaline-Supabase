@@ -36,14 +36,28 @@ const ChangePass: React.FC = () => {
   useEffect(() => {
     const parseUrlParams = () => {
       try {
-        // Get the hash part of the URL (after #)
+        // Get the full URL
+        const url = new URL(window.location.href);
+        
+        // For localhost development, we need to handle both hash and search params
         const hash = window.location.hash.substring(1);
         const hashParams = new URLSearchParams(hash.split('?')[1] || '');
         
-        // Get the email and token from hash parameters
-        const emailParam = hashParams.get('email');
-        const tokenParam = hashParams.get('access_token');
-        const typeParam = hashParams.get('type');
+        // Get parameters from both URL search params and hash params
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Combine parameters (hash params take precedence)
+        const emailParam = hashParams.get('email') || urlParams.get('email');
+        const tokenParam = hashParams.get('access_token') || urlParams.get('access_token');
+        const typeParam = hashParams.get('type') || urlParams.get('type');
+
+        console.log('URL Parameters:', {
+          emailParam,
+          tokenParam,
+          typeParam,
+          hash,
+          search: window.location.search
+        });
 
         if (!emailParam || !tokenParam || typeParam !== 'recovery') {
           setMessage('Invalid or expired password reset link');
@@ -69,9 +83,30 @@ const ChangePass: React.FC = () => {
     parseUrlParams();
   }, [history]);
 
-  // Password strength calculator (keep your existing implementation)
+  // Password strength calculator
   useEffect(() => {
-    // ... (keep your existing password strength logic)
+    if (!newPassword) {
+      setPasswordStrength({ value: 0, label: '', color: '' });
+      return;
+    }
+
+    let strength = 0;
+    if (newPassword.length >= 8) strength += 1;
+    if (newPassword.length >= 12) strength += 1;
+    if (/[A-Z]/.test(newPassword)) strength += 1;
+    if (/[a-z]/.test(newPassword)) strength += 1;
+    if (/[0-9]/.test(newPassword)) strength += 1;
+    if (/[^A-Za-z0-9]/.test(newPassword)) strength += 1;
+
+    if (strength <= 2) {
+      setPasswordStrength({ value: 0.25, label: 'Very Weak', color: 'danger' });
+    } else if (strength <= 4) {
+      setPasswordStrength({ value: 0.5, label: 'Weak', color: 'warning' });
+    } else if (strength <= 6) {
+      setPasswordStrength({ value: 0.75, label: 'Strong', color: 'success' });
+    } else {
+      setPasswordStrength({ value: 1, label: 'Very Strong', color: 'primary' });
+    }
   }, [newPassword]);
 
   const handlePasswordReset = async () => {
