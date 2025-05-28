@@ -62,7 +62,7 @@ const Login: React.FC = () => {
       totp: false,
       face: false,
       voice: false,
-      recovery: false // Changed from true to false to reflect actual checks
+      recovery: false
     }
   });
 
@@ -89,18 +89,14 @@ const Login: React.FC = () => {
 
       if (error) throw error;
 
+      // Store the session temporarily but don't complete login yet
       setMfaState(prev => ({
         ...prev,
-        showTotpModal: false,
-        showFaceModal: false,
-        showVoiceModal: false,
-        showRecoveryModal: false,
-        showActionSheet: false,
         currentUser: data.user,
-        sessionFor2FA: data,
-        currentMethod: null
+        sessionFor2FA: data
       }));
 
+      // Check MFA factors - this will determine if we need MFA
       await checkAuthFactors(data.user);
     } catch (error: any) {
       setAlertMessage(error.message || 'Login failed');
@@ -126,8 +122,6 @@ const Login: React.FC = () => {
         supabase.from('recovery_codes').select('*').eq('user_id', userId).eq('code_status', 'active')
       ]);
 
-      console.log('Recovery codes check:', recoveryData);
-
       // Update available methods
       const availableMethods = {
         totp: !!totpData,
@@ -136,7 +130,9 @@ const Login: React.FC = () => {
         recovery: !!recoveryData && recoveryData.length > 0
       };
 
-      console.log('Available methods:', availableMethods);
+      // Check if any MFA method is available
+      const mfaRequired = availableMethods.totp || availableMethods.face || 
+                         availableMethods.voice || availableMethods.recovery;
 
       setMfaState(prev => ({
         ...prev,
@@ -144,37 +140,41 @@ const Login: React.FC = () => {
         currentUser: user
       }));
 
-      // Check which method to show first (priority order: totp > face > voice > recovery)
-      if (totpData) {
-        setMfaState(prev => ({
-          ...prev,
-          showTotpModal: true,
-          currentMethod: 'totp'
-        }));
-      } else if (faceData) {
-        setMfaState(prev => ({
-          ...prev,
-          showFaceModal: true,
-          currentMethod: 'face'
-        }));
-      } else if (voiceData) {
-        setMfaState(prev => ({
-          ...prev,
-          showVoiceModal: true,
-          currentMethod: 'voice'
-        }));
-      } else if (availableMethods.recovery) {
-        setMfaState(prev => ({
-          ...prev,
-          showRecoveryModal: true,
-          currentMethod: 'recovery'
-        }));
+      if (mfaRequired) {
+        // Show the highest priority MFA method
+        if (availableMethods.totp) {
+          setMfaState(prev => ({
+            ...prev,
+            showTotpModal: true,
+            currentMethod: 'totp'
+          }));
+        } else if (availableMethods.face) {
+          setMfaState(prev => ({
+            ...prev,
+            showFaceModal: true,
+            currentMethod: 'face'
+          }));
+        } else if (availableMethods.voice) {
+          setMfaState(prev => ({
+            ...prev,
+            showVoiceModal: true,
+            currentMethod: 'voice'
+          }));
+        } else if (availableMethods.recovery) {
+          setMfaState(prev => ({
+            ...prev,
+            showRecoveryModal: true,
+            currentMethod: 'recovery'
+          }));
+        }
       } else {
+        // No MFA required, complete login
         completeLogin();
       }
     } catch (error) {
       console.error('Error checking MFA factors:', error);
-      completeLogin(); // Fallback to regular login
+      setAlertMessage('Error checking authentication methods');
+      setShowAlert(true);
     } finally {
       setIsLoading(false);
     }
@@ -202,7 +202,6 @@ const Login: React.FC = () => {
   };
 
   const showAlternativeMethods = () => {
-    console.log('Showing alternative methods', mfaState.availableMethods);
     setMfaState(prev => ({
       ...prev,
       showTotpModal: false,
@@ -223,23 +222,6 @@ const Login: React.FC = () => {
       showRecoveryModal: method === 'recovery',
       currentMethod: method
     }));
-  };
-
-  const verifyRecoveryCode = async (code: string): Promise<boolean> => {
-    if (!mfaState.currentUser) return false;
-
-    try {
-      const { data, error } = await supabase.rpc('verify_recovery_code', {
-        user_id: mfaState.currentUser.id,
-        code: code
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Recovery code verification error:', error);
-      return false;
-    }
   };
 
   return (
@@ -368,8 +350,6 @@ const Login: React.FC = () => {
           userId={mfaState.currentUser?.id}
           onTryAnotherWay={showAlternativeMethods}
         />
-
-       // In your Login component, update the RecoveryCodeLoginModal usage to:
 
         <RecoveryCodeLoginModal
           isOpen={mfaState.showRecoveryModal}
