@@ -1,13 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, CSSProperties } from 'react';
 import {
   IonToggle,
   IonLabel,
   IonCard,
   IonCardContent,
   IonIcon,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonToast,
   IonText,
   IonSpinner,
@@ -18,484 +15,381 @@ import {
   IonTitle,
   IonContent,
   IonFooter,
-  IonButton 
+  IonButton
 } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
-import Human from '@vladmandic/human';
 
-interface Props {
-  initialEnabled?: boolean;
-  onToggleChange: (enabled: boolean) => void;
-  disabled?: boolean;
-}
-
-const FacialRecognitionToggle: React.FC<Props> = ({ 
-  initialEnabled = false, 
-  onToggleChange,
-  disabled 
-}) => {
-  const [enabled, setEnabled] = useState(initialEnabled);
+const FacialRecognitionToggle = () => {
+  // State management
+  const [enabled, setEnabled] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [showCameraModal, setShowCameraModal] = useState(false);
-  const [detectionStatus, setDetectionStatus] = useState('');
+  const [loading, setLoading] = useState({
+    models: false,
+    camera: false,
+    upload: false
+  });
+  const [error, setError] = useState('');
+  const [showCamera, setShowCamera] = useState(false);
+  const [detectionStatus, setDetectionStatus] = useState('Align your face in the frame');
+
+  // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const humanRef = useRef<Human | null>(null);
-  const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const stableFaceCountRef = useRef(0);
+  const faceapiRef = useRef<any>(null);
+  const detectionInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Check environment and auth state on mount
+  // Cleanup on unmount
   useEffect(() => {
-    checkExistingPhoto();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
-        checkExistingPhoto();
-      }
-    });
-
     return () => {
-      cleanupCamera();
-      subscription?.unsubscribe();
+      if (detectionInterval.current) {
+        clearInterval(detectionInterval.current);
+      }
+      stopCamera();
     };
   }, []);
 
-  // Check for existing facial enrollment
-  const checkExistingPhoto = async () => {
+  const loadModels = async () => {
+    setLoading(prev => ({ ...prev, models: true }));
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setEnabled(false);
-        return;
+      const faceapi = await import('face-api.js');
+      faceapiRef.current = faceapi;
+
+      // Try loading from multiple CDN sources
+      const CDN_SOURCES = [
+        'https://justadudewhohacks.github.io/face-api.js/models',
+        'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/models'
+      ];
+
+      for (const cdnUrl of CDN_SOURCES) {
+        try {
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(cdnUrl),
+            faceapi.nets.faceLandmark68TinyNet.loadFromUri(cdnUrl),
+            faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
+          ]);
+          return true;
+        } catch (e) {
+          console.warn(`Failed loading from ${cdnUrl}`);
+        }
       }
-
-      const { data: enrollment } = await supabase
-        .from('user_facial_enrollments')
-        .select('storage_path')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!enrollment?.storage_path) {
-        setEnabled(false);
-        return;
-      }
-
-      const { data: signedUrlData } = await supabase.storage
-        .from('facial-recognition')
-        .createSignedUrl(enrollment.storage_path, 3600);
-
-      if (!signedUrlData) {
-        setEnabled(false);
-        return;
-      }
-      
-      setPhoto(signedUrlData.signedUrl);
-      setEnabled(true);
-      onToggleChange(true);
-    } catch (error) {
-      console.error('Photo check error:', error);
-      setEnabled(false);
-      onToggleChange(false);
-      await cleanupEnrollment();
-    }
-  };
-
-  // Initialize Human.js
-  const initializeHuman = async () => {
-    try {
-      const human = new Human({
-        backend: 'webgl',
-        modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models',
-        face: {
-          enabled: true,
-          detector: { rotation: true },
-          mesh: { enabled: true },
-          iris: { enabled: true },
-          description: { enabled: true },
-          emotion: { enabled: false },
-        },
-        filter: { enabled: false },
-        gesture: { enabled: false },
-        object: { enabled: false },
-      });
-
-      await human.load();
-      await human.warmup();
-      humanRef.current = human;
-      return true;
-    } catch (error) {
-      console.error('Human initialization failed:', error);
+      throw new Error('All CDN sources failed');
+    } catch (err) {
+      setError('Failed to load face detection models');
       return false;
+    } finally {
+      setLoading(prev => ({ ...prev, models: false }));
     }
   };
 
-  // Start face detection loop
-  const startFaceDetection = async () => {
-    if (!videoRef.current || !humanRef.current) return;
-
-    try {
-      const result = await humanRef.current.detect(videoRef.current);
-      processDetectionResult(result);
-      
-      if (showCameraModal) {
-        requestAnimationFrame(startFaceDetection);
-      }
-    } catch (error) {
-      console.error('Detection error:', error);
-      if (showCameraModal) {
-        setTimeout(() => startFaceDetection(), 100);
-      }
-    }
-  };
-
-  // Process detection results and determine if face is stable
-  const processDetectionResult = (result: any) => {
-    if (!result?.face || result.face.length === 0) {
-      setDetectionStatus('No face detected');
-      stableFaceCountRef.current = 0;
-      return;
-    }
-
-    // We only want one face
-    if (result.face.length > 1) {
-      setDetectionStatus('Multiple faces detected - please show only your face');
-      stableFaceCountRef.current = 0;
-      return;
-    }
-
-    const face = result.face[0];
-    
-    // Check face quality
-    if (face.score < 0.8) {
-      setDetectionStatus('Face not clear - please move closer');
-      stableFaceCountRef.current = 0;
-      return;
-    }
-
-    // Check face rotation
-    if (Math.abs(face.rotation?.angle?.roll || 0) > 15 || 
-        Math.abs(face.rotation?.angle?.pitch || 0) > 15 || 
-        Math.abs(face.rotation?.angle?.yaw || 0) > 15) {
-      setDetectionStatus('Face not straight - please look directly at the camera');
-      stableFaceCountRef.current = 0;
-      return;
-    }
-
-    // Face is good, increment stable count
-    stableFaceCountRef.current++;
-    setDetectionStatus(`Aligning face... ${Math.min(5, stableFaceCountRef.current)}/5`);
-
-    // If face has been stable for 5 frames, capture
-    if (stableFaceCountRef.current >= 5) {
-      capturePhoto();
-    }
-  };
-
-  // Capture photo from video stream
-  const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob(async (blob) => {
-      if (blob) await uploadPhoto(blob);
-      closeCamera();
-    }, 'image/jpeg', 0.9); // Higher quality for enrollment
-  };
-
-  // Start camera with error handling
   const startCamera = async () => {
-    try {
-      setShowCameraModal(true);
-      stableFaceCountRef.current = 0;
-      
-      const success = await initializeHuman();
-      if (!success) {
-        setToastMessage('Face detection initialization failed');
-        setShowToast(true);
-        closeCamera();
-        return;
-      }
+    setShowCamera(true);
+    setLoading(prev => ({ ...prev, camera: true }));
+    setDetectionStatus('Align your face in the frame');
 
+    try {
+      // Start camera stream
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user' 
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
         }
       });
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        startFaceDetection();
+        await new Promise((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = resolve;
+          }
+        });
       }
-    } catch (error) {
-      console.error('Camera error:', error);
-      setToastMessage('Camera access required');
-      setShowToast(true);
+
+      // Load models in background
+      const modelsLoaded = await loadModels();
+      if (modelsLoaded) {
+        // Start face detection
+        detectionInterval.current = setInterval(detectFace, 500);
+      } else {
+        setDetectionStatus('Face detection not available - camera only');
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      setError('Camera access required');
+      setShowCamera(false);
       setEnabled(false);
-      onToggleChange(false);
+    } finally {
+      setLoading(prev => ({ ...prev, camera: false }));
     }
   };
 
-  // Upload photo to Supabase
-  const uploadPhoto = async (blob: Blob) => {
-    setUploading(true);
+  const detectFace = async () => {
+    if (!videoRef.current || !faceapiRef.current) return;
+
     try {
+      const detections = await faceapiRef.current.detectAllFaces(
+        videoRef.current,
+        new faceapiRef.current.TinyFaceDetectorOptions()
+      ).withFaceLandmarks();
+
+      if (detections.length === 0) {
+        setDetectionStatus('No face detected - position your face in frame');
+        return;
+      }
+
+      if (detections.length > 1) {
+        setDetectionStatus('Only one face allowed in frame');
+        return;
+      }
+
+      const face = detections[0];
+      if (face.detection.score < 0.7) {
+        setDetectionStatus('Move closer to camera');
+        return;
+      }
+
+      // Check face alignment using landmarks
+      const landmarks = face.landmarks;
+      const jawOutline = landmarks.getJawOutline();
+      const nose = landmarks.getNose();
+
+      // Simple alignment check
+      const jawWidth = jawOutline[jawOutline.length - 1].x - jawOutline[0].x;
+      const nosePosition = nose[3].x; // Tip of nose
+      const faceCenter = jawOutline[0].x + jawWidth / 2;
+
+      if (Math.abs(nosePosition - faceCenter) > jawWidth * 0.2) {
+        setDetectionStatus('Face not centered - look straight at camera');
+        return;
+      }
+
+      // If we get here, face is properly aligned
+      setDetectionStatus('Face detected - capturing...');
+      await capturePhoto();
+    } catch (err) {
+      console.error('Detection error:', err);
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || detectionInterval.current === null) return;
+
+    clearInterval(detectionInterval.current);
+    detectionInterval.current = null;
+
+    setLoading(prev => ({ ...prev, upload: true }));
+
+    try {
+      // Create canvas and draw video frame
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(videoRef.current, 0, 0);
+
+      // Convert to blob
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+      });
+
+      if (!blob) throw new Error('Failed to create image blob');
+
+      // Upload to Supabase
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const filePath = `${user.id}/enrollment_${Date.now()}.jpg`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('facial-recognition')
-        .upload(filePath, blob, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: 'image/jpeg'
-        });
+      const filePath = `faces/${user.id}/${Date.now()}.jpg`;
+      const { error } = await supabase.storage
+        .from('face-recognition')
+        .upload(filePath, blob);
 
-      if (uploadError) throw uploadError;
+      if (error) throw error;
 
-      const { error: dbError } = await supabase
-        .from('user_facial_enrollments')
-        .upsert({
-          user_id: user.id,
-          storage_path: filePath
-        }, { onConflict: 'user_id' });
-
-      if (dbError) throw dbError;
-
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('facial-recognition')
+        .from('face-recognition')
         .getPublicUrl(filePath);
 
       setPhoto(publicUrl);
       setEnabled(true);
-      onToggleChange(true);
-      setToastMessage('Face registered successfully!');
-    } catch (error) {
-      console.error('Upload error:', error);
-      setToastMessage(`Error: ${error instanceof Error ? error.message : 'Failed to save'}`);
-      setEnabled(false);
-      onToggleChange(false);
+      setDetectionStatus('Registration complete!');
+
+      // Keep the success message visible for 2 seconds before closing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (err) {
+      setError('Failed to save face');
+      console.error('Upload error:', err);
     } finally {
-      setUploading(false);
+      setLoading(prev => ({ ...prev, upload: false }));
+      stopCamera();
     }
   };
 
-  // Toggle handler
-  const handleToggle = async (e: CustomEvent) => {
-    const isEnabled = e.detail.checked;
-    
-    // If disabling, clean up
-    if (!isEnabled) {
-      await cleanupEnrollment();
-      return;
-    }
-    
-    // If enabling, check if we already have a photo
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setToastMessage('Please sign in first');
-      setShowToast(true);
-      setEnabled(false);
-      return;
-    }
-
-    const { data: existing } = await supabase
-      .from('user_facial_enrollments')
-      .select()
-      .eq('user_id', user.id)
-      .single();
-
-    if (existing) {
-      // Already enrolled, just enable
-      setEnabled(true);
-      onToggleChange(true);
-      await checkExistingPhoto();
-    } else {
-      // Need to enroll
-      await startCamera();
-    }
-  };
-
-  // Cleanup enrollment data
-  const cleanupEnrollment = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: enrollment } = await supabase
-          .from('user_facial_enrollments')
-          .select('storage_path')
-          .eq('user_id', user.id)
-          .single();
-
-        await supabase
-          .from('user_facial_enrollments')
-          .delete()
-          .eq('user_id', user.id);
-
-        if (enrollment?.storage_path) {
-          await supabase.storage
-            .from('facial-recognition')
-            .remove([enrollment.storage_path]);
-        }
-      }
-    } catch (error) {
-      console.error('Cleanup error:', error);
-    } finally {
-      setPhoto(null);
-      setEnabled(false);
-      onToggleChange(false);
-    }
-  };
-
-  // Cleanup camera resources
-  const cleanupCamera = () => {
-    if (humanRef.current) {
-      humanRef.current = null;
-    }
-    if (detectionTimeoutRef.current) {
-      clearTimeout(detectionTimeoutRef.current);
+  const stopCamera = () => {
+    if (detectionInterval.current) {
+      clearInterval(detectionInterval.current);
+      detectionInterval.current = null;
     }
     if (videoRef.current?.srcObject) {
       (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
+    setShowCamera(false);
     setDetectionStatus('');
   };
 
-  const closeCamera = () => {
-    cleanupCamera();
-    setShowCameraModal(false);
+  const handleToggle = async (e: CustomEvent) => {
+    const isEnabled = e.detail.checked;
+    setEnabled(isEnabled);
+
+    if (isEnabled) {
+      await startCamera();
+    } else {
+      stopCamera();
+      setPhoto(null);
+    }
   };
 
+  // Typed inline styles
+  const styles: Record<string, CSSProperties> = {
+    container: {
+      padding: '16px'
+    },
+    toggleContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      marginBottom: '16px'
+    },
+    photoContainer: {
+      marginTop: '16px',
+      textAlign: 'center'
+    },
+    photoImage: {
+      width: '150px',
+      height: '150px',
+      borderRadius: '50%',
+      margin: '0 auto',
+      display: 'block',
+      border: '2px solid #3880ff' // Using hex color instead of CSS variable
+    },
+    modalContent: {
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#000',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    video: {
+      width: '100%',
+      maxHeight: '80vh',
+      objectFit: 'cover' as const
+    },
+    statusMessage: {
+      position: 'absolute',
+      bottom: '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      textAlign: 'center',
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      color: 'white',
+      padding: '10px 20px',
+      borderRadius: '20px',
+      maxWidth: '80%',
+      zIndex: 10
+    },
+    modalHeader: {
+      background: '#3880ff', // Using hex color instead of CSS variable
+      color: 'white'
+    },
+    spinner: {
+      marginLeft: '8px'
+    }
+  };
+
+
   return (
-    <div className="ion-padding">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div style={styles.container}>
+      <div style={styles.toggleContainer}>
         <IonLabel>
           <strong>Facial Recognition</strong>
+          {loading.models && <IonText color="medium"><p>Loading models...</p></IonText>}
         </IonLabel>
-        {uploading ? (
+
+        {(loading.models || loading.camera || loading.upload) ? (
           <IonSpinner name="crescent" />
         ) : (
           <IonToggle
             checked={enabled}
             onIonChange={handleToggle}
-            disabled={uploading || disabled}
+            disabled={loading.models || loading.camera || loading.upload}
           />
         )}
       </div>
 
       {photo && (
-        <IonCard>
+        <IonCard style={styles.photoContainer}>
           <IonCardContent>
-            <IonGrid>
-              <IonRow className="ion-justify-content-center">
-                <IonCol size="12" className="ion-text-center">
-                  <IonImg
-                    src={photo}
-                    style={{
-                      width: '150px',
-                      height: '150px',
-                      borderRadius: '50%',
-                      margin: '0 auto',
-                      objectFit: 'cover'
-                    }}
-                  />
-                  <IonText color="success">
-                    <p>Face registered</p>
-                  </IonText>
-                </IonCol>
-              </IonRow>
-            </IonGrid>
+            <IonImg src={photo} style={styles.photoImage} />
+            <IonText color="medium">
+              <p>Your registered face</p>
+            </IonText>
           </IonCardContent>
         </IonCard>
       )}
 
-      <IonModal 
-        isOpen={showCameraModal}
-        onDidDismiss={closeCamera}
-        style={{width: '100%',height: '100%',background: '#000'}}
+      <IonModal
+        isOpen={showCamera}
+        onDidDismiss={() => {
+          stopCamera();
+          setEnabled(false);
+        }}
       >
-        <IonHeader>
-          <IonToolbar color="primary">
-            <IonTitle>Register Your Face</IonTitle>
+        <IonHeader style={styles.modalHeader}>
+          <IonToolbar>
+            <IonTitle>Face Registration</IonTitle>
           </IonToolbar>
         </IonHeader>
-        <IonContent className="ion-padding">
-          <div style={{
-            position: 'relative',
-            height: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
+        <IonContent>
+          <div style={styles.modalContent}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              style={{
-                maxWidth: '100%',
-                maxHeight: '70vh',
-                borderRadius: '8px'
-              }}
+              style={styles.video}
             />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-            
-            {detectionStatus && (
-              <div style={{
-                position: 'absolute',
-                bottom: '20px',
-                left: 0,
-                right: 0,
-                textAlign: 'center',
-                color: 'white',
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                padding: '10px',
-                borderRadius: '4px'
-              }}>
-                {detectionStatus.includes('Aligning') && (
-                  <IonSpinner name="crescent" color="light" style={{ marginRight: '8px' }} />
-                )}
-                <span>{detectionStatus}</span>
-              </div>
-            )}
+            <div style={styles.statusMessage}>
+              {detectionStatus}
+              {(loading.upload) && <IonSpinner name="dots" style={{ marginLeft: '8px' }} />}
+            </div>
           </div>
         </IonContent>
         <IonFooter>
           <IonToolbar>
-            <IonButton 
-              expand="block" 
-              color="medium" 
-              onClick={closeCamera}
-              style={{ margin: '8px' }}
+            <IonButton
+              expand="block"
+              onClick={() => {
+                stopCamera();
+                setEnabled(false);
+              }}
+              color="danger"
             >
               <IonIcon icon={close} slot="start" />
-              Cancel
+              Cancel Registration
             </IonButton>
           </IonToolbar>
         </IonFooter>
       </IonModal>
 
       <IonToast
-        isOpen={showToast}
-        onDidDismiss={() => setShowToast(false)}
-        message={toastMessage}
+        isOpen={!!error}
+        message={error}
         duration={3000}
-        position="top"
+        onDidDismiss={() => setError('')}
+        color="danger"
       />
     </div>
   );
