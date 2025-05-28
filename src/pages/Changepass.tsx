@@ -34,54 +34,52 @@ const ChangePass: React.FC = () => {
 
   // Parse URL parameters on component mount
   useEffect(() => {
-    const parseUrlParams = () => {
+    const parseUrlParams = async () => {
       try {
-        // Get the full URL
-        const url = new URL(window.location.href);
+        console.log('Current URL:', window.location.href);
         
-        // For localhost development, we need to handle both hash and search params
-        const hash = window.location.hash.substring(1);
-        const hashParams = new URLSearchParams(hash.split('?')[1] || '');
-        
-        // Get parameters from both URL search params and hash params
+        // Password reset links typically have params in the query string
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Combine parameters (hash params take precedence)
-        const emailParam = hashParams.get('email') || urlParams.get('email');
-        const tokenParam = hashParams.get('access_token') || urlParams.get('access_token');
-        const typeParam = hashParams.get('type') || urlParams.get('type');
+        const emailParam = urlParams.get('email');
+        const tokenParam = urlParams.get('access_token');
+        const typeParam = urlParams.get('type');
 
-        console.log('URL Parameters:', {
-          emailParam,
-          tokenParam,
-          typeParam,
-          hash,
-          search: window.location.search
+        console.log('Extracted params:', { 
+          email: emailParam, 
+          token: tokenParam, 
+          type: typeParam 
         });
 
         if (!emailParam || !tokenParam || typeParam !== 'recovery') {
-          setMessage('Invalid or expired password reset link');
-          setShowAlert(true);
-          setTimeout(() => {
-            history.push('/');
-          }, 3000);
-          return;
+          throw new Error('Missing required parameters in URL');
         }
 
+        // Verify the token first before setting state
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          email: emailParam,
+          token: tokenParam,
+          type: 'recovery'
+        });
+
+        if (verifyError) {
+          throw verifyError;
+        }
+
+        // Only set state if verification succeeds
         setEmail(decodeURIComponent(emailParam));
         setToken(tokenParam);
-      } catch (error) {
-        console.error('Error parsing URL:', error);
-        setMessage('Invalid password reset link');
+        
+      } catch (error: any) {
+        console.error('Error in parseUrlParams:', error);
+        setMessage(error.message || 'Invalid or expired password reset link. Please request a new one.');
         setShowAlert(true);
-        setTimeout(() => {
-          history.push('/');
-        }, 3000);
+        // Don't redirect automatically - let user dismiss the alert
       }
     };
 
     parseUrlParams();
-  }, [history]);
+  }, []);
 
   // Password strength calculator
   useEffect(() => {
@@ -131,18 +129,7 @@ const ChangePass: React.FC = () => {
     setLoading(true);
 
     try {
-      // First verify the token with the email
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'recovery'
-      });
-
-      if (verifyError) {
-        throw verifyError;
-      }
-
-      // Then update the password
+      // Update the password (token already verified in useEffect)
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
@@ -151,15 +138,15 @@ const ChangePass: React.FC = () => {
         throw updateError;
       }
 
-      setMessage('Password updated successfully! Redirecting...');
+      setMessage('Password updated successfully! Redirecting to login...');
       setShowToast(true);
       
       setTimeout(() => {
-        history.push('/');
+        history.push('/login'); // Redirect to login page after success
       }, 2000);
     } catch (error: any) {
       console.error('Password reset error:', error);
-      setMessage(error.message || 'Password reset failed. The link may have expired or is invalid.');
+      setMessage(error.message || 'Password reset failed. Please try again.');
       setShowAlert(true);
     } finally {
       setLoading(false);
@@ -199,7 +186,6 @@ const ChangePass: React.FC = () => {
             Reset Password
           </h1>
 
-          {/* Display the email in a read-only field */}
           <IonItem style={{ marginBottom: '1rem' }}>
             <IonLabel position="stacked">Email</IonLabel>
             <IonInput 
@@ -246,7 +232,7 @@ const ChangePass: React.FC = () => {
           <IonButton 
             expand="block" 
             onClick={handlePasswordReset}
-            disabled={loading}
+            disabled={loading || !email || !token}
             style={{ marginTop: '1rem' }}
           >
             {loading ? 'Processing...' : 'Reset Password'}
