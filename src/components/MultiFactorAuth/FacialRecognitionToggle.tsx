@@ -1,52 +1,34 @@
 import React, { useState, useRef, useEffect, CSSProperties } from 'react';
 import {
-  IonToggle,
-  IonLabel,
-  IonCard,
-  IonCardContent,
-  IonIcon,
-  IonToast,
-  IonText,
-  IonSpinner,
-  IonImg,
-  IonModal,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonFooter,
-  IonButton
+  IonToggle, IonLabel, IonCard, IonCardContent, IonIcon,
+  IonToast, IonText, IonSpinner, IonImg, IonModal,
+  IonHeader, IonToolbar, IonTitle, IonContent, IonFooter, IonButton
 } from '@ionic/react';
-import { close } from 'ionicons/icons';
+import { close, helpCircle } from 'ionicons/icons';
 import { supabase } from '../../utils/supaBaseClient';
 
 const FacialRecognitionToggle = () => {
-  // State management
+  // State
   const [enabled, setEnabled] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState({
-    models: false,
-    camera: false,
-    upload: false
+    models: false, camera: false, upload: false
   });
   const [error, setError] = useState('');
   const [showCamera, setShowCamera] = useState(false);
-  const [detectionStatus, setDetectionStatus] = useState('Align your face with the circle');
+  const [detectionStatus, setDetectionStatus] = useState('Align face in circle');
   const [facePosition, setFacePosition] = useState<{x: number, y: number, size: number} | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const faceapiRef = useRef<any>(null);
   const detectionInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (detectionInterval.current) {
-        clearInterval(detectionInterval.current);
-      }
-      stopCamera();
-    };
+  // Cleanup
+  useEffect(() => () => {
+    if (detectionInterval.current) clearInterval(detectionInterval.current);
+    stopCamera();
   }, []);
 
   const loadModels = async () => {
@@ -54,27 +36,14 @@ const FacialRecognitionToggle = () => {
     try {
       const faceapi = await import('face-api.js');
       faceapiRef.current = faceapi;
-
-      const CDN_SOURCES = [
-        'https://justadudewhohacks.github.io/face-api.js/models',
-        'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/models'
-      ];
-
-      for (const cdnUrl of CDN_SOURCES) {
-        try {
-          await Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri(cdnUrl),
-            faceapi.nets.faceLandmark68TinyNet.loadFromUri(cdnUrl),
-            faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
-          ]);
-          return true;
-        } catch (e) {
-          console.warn(`Failed loading from ${cdnUrl}`);
-        }
-      }
-      throw new Error('All CDN sources failed');
+      
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+      ]);
+      return true;
     } catch (err) {
-      setError('Failed to load face detection models');
+      setError('Failed to load face models');
       return false;
     } finally {
       setLoading(prev => ({ ...prev, models: false }));
@@ -84,14 +53,14 @@ const FacialRecognitionToggle = () => {
   const startCamera = async () => {
     setShowCamera(true);
     setLoading(prev => ({ ...prev, camera: true }));
-    setDetectionStatus('Align your face with the circle');
+    setDetectionStatus('Align face in circle');
     setFacePosition(null);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
           facingMode: 'user'
         }
       });
@@ -99,20 +68,14 @@ const FacialRecognitionToggle = () => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await new Promise((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = resolve;
-          }
+          if (videoRef.current) videoRef.current.onloadedmetadata = resolve;
         });
       }
 
-      const modelsLoaded = await loadModels();
-      if (modelsLoaded) {
+      if (await loadModels()) {
         detectionInterval.current = setInterval(detectFace, 500);
-      } else {
-        setDetectionStatus('Face detection not available - camera only');
       }
     } catch (err) {
-      console.error('Camera error:', err);
       setError('Camera access required');
       setShowCamera(false);
       setEnabled(false);
@@ -127,94 +90,95 @@ const FacialRecognitionToggle = () => {
     try {
       const detections = await faceapiRef.current.detectAllFaces(
         videoRef.current,
-        new faceapiRef.current.TinyFaceDetectorOptions()
+        new faceapiRef.current.TinyFaceDetectorOptions({
+          inputSize: 512,
+          scoreThreshold: 0.5
+        })
       ).withFaceLandmarks();
 
-      if (detections.length === 0) {
-        setDetectionStatus('No face detected - position inside the circle');
-        setFacePosition(null);
-        return;
-      }
-
-      if (detections.length > 1) {
-        setDetectionStatus('Only one face allowed in frame');
+      if (detections.length !== 1) {
+        setDetectionStatus(detections.length > 1 ? 'Only one face allowed' : 'No face detected');
         setFacePosition(null);
         return;
       }
 
       const face = detections[0];
-      if (face.detection.score < 0.7) {
-        setDetectionStatus('Move closer to camera');
-        setFacePosition(null);
-        return;
-      }
-
-      // Calculate face position relative to video
-      const videoRect = videoRef.current.getBoundingClientRect();
-      const box = face.detection.box;
+      const landmarks = face.landmarks;
       
-      // Position for the green outline
+      // Robust facial points detection
+      const noseTip = landmarks.getNose()[3];
+      const chin = landmarks.getJawOutline()[8];
+      const leftEar = landmarks.getJawOutline()[0];
+      const rightEar = landmarks.getJawOutline()[16];
+      
+      const faceWidth = rightEar.x - leftEar.x;
+      const faceHeight = chin.y - noseTip.y;
+      const noseCenterOffset = Math.abs(noseTip.x - (leftEar.x + faceWidth/2));
+
       setFacePosition({
-        x: box.x,
-        y: box.y,
-        size: Math.max(box.width, box.height)
+        x: face.detection.box.x,
+        y: face.detection.box.y,
+        size: Math.max(face.detection.box.width, face.detection.box.height)
       });
 
-      // Check if face is centered in the grid (20% padding)
-      const isCentered = (
-        Math.abs(box.x - videoRect.width * 0.2) < 30 &&
-        Math.abs(box.y - videoRect.height * 0.2) < 30 &&
-        Math.abs(box.width - videoRect.width * 0.6) < 50 &&
-        Math.abs(box.height - videoRect.height * 0.6) < 50
-      );
-
-      if (!isCentered) {
-        setDetectionStatus('Center your face in the circle');
+      if (noseCenterOffset > faceWidth * 0.15) {
+        setDetectionStatus("Center your face");
         return;
       }
 
-      // Check face alignment using landmarks
-      const landmarks = face.landmarks;
-      const jawOutline = landmarks.getJawOutline();
-      const nose = landmarks.getNose();
-      const jawWidth = jawOutline[jawOutline.length - 1].x - jawOutline[0].x;
-      const nosePosition = nose[3].x;
-      const faceCenter = jawOutline[0].x + jawWidth / 2;
-
-      if (Math.abs(nosePosition - faceCenter) > jawWidth * 0.2) {
-        setDetectionStatus('Look straight at the camera');
+      if (faceHeight / faceWidth < 0.8 || faceHeight / faceWidth > 1.5) {
+        setDetectionStatus("Adjust distance");
         return;
       }
 
-      // If we get here, face is properly aligned
-      setDetectionStatus('Perfect! Capturing...');
+      setDetectionStatus("Perfect! Capturing...");
       await capturePhoto();
+
+      if (debugMode) {
+        const canvas = document.getElementById('debug-canvas') as HTMLCanvasElement;
+        if (canvas) {
+          faceapiRef.current.draw.drawFaceLandmarks(canvas, landmarks);
+        }
+      }
     } catch (err) {
-      console.error('Detection error:', err);
+      console.error("Detection error:", err);
     }
   };
 
   const capturePhoto = async () => {
-    if (!videoRef.current || detectionInterval.current === null) return;
-
-    clearInterval(detectionInterval.current);
-    detectionInterval.current = null;
+    if (!videoRef.current) return;
 
     setLoading(prev => ({ ...prev, upload: true }));
-
+    
     try {
+      const video = videoRef.current;
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(videoRef.current, 0, 0);
+      const ctx = canvas.getContext('2d')!;
 
+      // Crop to circular area (80% of video dimensions)
+      const diameter = Math.min(video.videoWidth, video.videoHeight) * 0.8;
+      canvas.width = diameter;
+      canvas.height = diameter;
+
+      // Create circular clipping path
+      ctx.beginPath();
+      ctx.arc(diameter/2, diameter/2, diameter/2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      // Draw video frame centered in circle
+      const offsetX = (video.videoWidth - diameter) / 2;
+      const offsetY = (video.videoHeight - diameter) / 2;
+      ctx.drawImage(video, offsetX, offsetY, diameter, diameter, 0, 0, diameter, diameter);
+
+      // Convert to blob
       const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob(resolve, 'image/jpeg', 0.9);
       });
 
-      if (!blob) throw new Error('Failed to create image blob');
+      if (!blob) throw new Error('Failed to create image');
 
+      // Upload to Supabase
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -225,18 +189,18 @@ const FacialRecognitionToggle = () => {
 
       if (error) throw error;
 
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('face-recognition')
         .getPublicUrl(filePath);
 
       setPhoto(publicUrl);
       setEnabled(true);
-      setDetectionStatus('Registration complete!');
+      setDetectionStatus('Success!');
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (err) {
-      setError('Failed to save face');
-      console.error('Upload error:', err);
+      setError('Failed to save photo');
+      console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, upload: false }));
       stopCamera();
@@ -254,7 +218,6 @@ const FacialRecognitionToggle = () => {
     }
     setShowCamera(false);
     setFacePosition(null);
-    setDetectionStatus('');
   };
 
   const handleToggle = async (e: CustomEvent) => {
@@ -310,18 +273,10 @@ const FacialRecognitionToggle = () => {
       position: 'absolute',
       width: '80%',
       height: '80%',
-      border: '2px dashed rgba(255, 255, 255, 0.5)',
+      border: '2px solid white',
       borderRadius: '50%',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      padding: '20px',
+      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
       pointerEvents: 'none',
-    },
-    gridLine: {
-      width: '100%',
-      height: '1px',
-      background: 'rgba(255, 255, 255, 0.3)',
     },
     faceOutline: {
       position: 'absolute',
@@ -347,8 +302,21 @@ const FacialRecognitionToggle = () => {
       background: '#3880ff',
       color: 'white'
     },
-    spinner: {
-      marginLeft: '8px'
+    debugToggle: {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      zIndex: 100,
+      background: 'rgba(0,0,0,0.5)',
+      borderRadius: '50%'
+    },
+    debugCanvas: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      border: '2px solid red',
+      opacity: 0.7,
+      pointerEvents: 'none'
     }
   };
 
@@ -392,8 +360,17 @@ const FacialRecognitionToggle = () => {
         <IonHeader style={styles.modalHeader}>
           <IonToolbar>
             <IonTitle>Face Registration</IonTitle>
+            <IonButton 
+              slot="end" 
+              fill="clear" 
+              onClick={() => setDebugMode(!debugMode)}
+              style={styles.debugToggle}
+            >
+              <IonIcon icon={helpCircle} color="light" />
+            </IonButton>
           </IonToolbar>
         </IonHeader>
+        
         <IonContent>
           <div style={styles.cameraContainer}>
             <video
@@ -404,32 +381,35 @@ const FacialRecognitionToggle = () => {
               style={styles.video}
             />
             
-            {/* Grid Overlay */}
-            <div style={styles.gridOverlay}>
-              <div style={styles.gridLine}></div>
-              <div style={{ ...styles.gridLine, alignSelf: 'center', width: '1px', height: '80%' }}></div>
-              <div style={styles.gridLine}></div>
-            </div>
+            {debugMode && (
+              <canvas 
+                id="debug-canvas" 
+                width={videoRef.current?.videoWidth} 
+                height={videoRef.current?.videoHeight} 
+                style={styles.debugCanvas} 
+              />
+            )}
+
+            <div style={styles.gridOverlay} />
             
-            {/* Dynamic Face Outline */}
             {facePosition && (
               <div style={{
                 ...styles.faceOutline,
-                borderColor: detectionStatus === 'Perfect! Capturing...' ? '#4CAF50' : '#FF9800',
+                borderColor: detectionStatus.includes('Perfect') ? '#4CAF50' : '#FF9800',
                 left: `${facePosition.x}px`,
                 top: `${facePosition.y}px`,
                 width: `${facePosition.size}px`,
                 height: `${facePosition.size}px`,
-              }}></div>
+              }} />
             )}
-            
-            {/* Status Message */}
+
             <div style={styles.statusMessage}>
               {detectionStatus}
-              {loading.upload && <IonSpinner name="dots" style={styles.spinner} />}
+              {loading.upload && <IonSpinner name="dots" style={{ marginLeft: '8px' }} />}
             </div>
           </div>
         </IonContent>
+
         <IonFooter>
           <IonToolbar>
             <IonButton
@@ -441,7 +421,7 @@ const FacialRecognitionToggle = () => {
               color="danger"
             >
               <IonIcon icon={close} slot="start" />
-              Cancel Registration
+              Cancel
             </IonButton>
           </IonToolbar>
         </IonFooter>
