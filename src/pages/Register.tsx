@@ -289,7 +289,7 @@ const Register: React.FC = () => {
             </IonButton>
 
             <IonButton
-              routerLink="/#/"
+              routerLink="/"
               expand="block"
               fill="clear"
               shape="round"
