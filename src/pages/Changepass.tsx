@@ -33,9 +33,12 @@ const ChangePass: React.FC = () => {
 
     useEffect(() => {
         const queryString = window.location.search;
+        console.log('Query string:', queryString);
         const urlParams = new URLSearchParams(queryString);
         const emailParam = urlParams.get('email');
         const tokenParam = urlParams.get('token');
+        console.log('Email param:', emailParam);
+        console.log('Token param:', tokenParam);
 
         if (emailParam) {
             setEmail(decodeURIComponent(emailParam));
@@ -51,22 +54,27 @@ const ChangePass: React.FC = () => {
         if (!email || !token) {
             setAlertMessage("Invalid password reset link");
             setShowAlert(true);
-            return;
+            return false;
         }
 
         setIsLoading(true);
         try {
-            const { error } = await supabase.auth.verifyOtp({
+            const { data, error } = await supabase.auth.verifyOtp({
                 email,
                 token,
                 type: 'recovery'
             });
 
             if (error) throw error;
+            return true;
         } catch (error: any) {
+            console.error('Token verification error:', error);
             setAlertMessage("Invalid or expired reset link. Please request a new one.");
             setShowAlert(true);
-            window.location.href = 'https://cephaline-supabase.vercel.app/#/';
+            setTimeout(() => {
+                window.location.href = 'https://cephaline-supabase.vercel.app/#/';
+            }, 3000);
+            return false;
         } finally {
             setIsLoading(false);
         }
@@ -123,7 +131,12 @@ const ChangePass: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const { data, error } = await supabase.auth.updateUser({
+            // First verify the token again
+            const isValid = await verifyToken(email, token);
+            if (!isValid) return;
+
+            // Then update the password
+            const { error } = await supabase.auth.updateUser({
                 password: newPassword
             });
 
@@ -134,8 +147,11 @@ const ChangePass: React.FC = () => {
             setShowAlert(true);
 
             await supabase.auth.signOut();
-            window.location.href = 'https://cephaline-supabase.vercel.app/#/';
+            setTimeout(() => {
+                window.location.href = 'https://cephaline-supabase.vercel.app/#/';
+            }, 2000);
         } catch (error: any) {
+            console.error('Password update error:', error);
             setAlertMessage(error.message || "Password update failed. Please try again.");
             setShowAlert(true);
         } finally {
