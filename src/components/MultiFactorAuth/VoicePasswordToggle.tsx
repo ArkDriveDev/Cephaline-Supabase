@@ -33,123 +33,63 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [toastColor, setToastColor] = useState<'success' | 'warning' | 'danger'>('success');
   const [hasExistingPassword, setHasExistingPassword] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Handle prop changes
+  // Check for existing voice password when component mounts or when enabled changes
   useEffect(() => {
-    if (!isInitializing) {
-      setEnabled(initialEnabled);
-      // Sync with Supabase when enabled via props
-      if (initialEnabled) {
-        checkExistingVoicePassword();
-      } else {
-        setHasExistingPassword(false);
-      }
-    }
-  }, [initialEnabled]);
-
-  // Initial setup and auth state listener
-  useEffect(() => {
-    let isMounted = true;
-    
-    const initializeComponent = async () => {
+    const checkExistingVoicePassword = async () => {
+      if (!enabled) return;
+      
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!isMounted) return;
-
-        if (user) {
-          await checkExistingVoicePassword();
-        } else {
+        setIsProcessing(true);
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
           setEnabled(false);
           setHasExistingPassword(false);
           onToggleChange(false);
+          return;
+        }
+
+        const { data: voicePasswordData, error } = await supabase
+          .from('user_voice_passwords')
+          .select('password')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (voicePasswordData) {
+          setHasExistingPassword(true);
+        } else {
+          setHasExistingPassword(false);
         }
       } catch (error) {
-        console.error('Initialization error:', error);
-        if (isMounted) {
-          setEnabled(false);
-          setHasExistingPassword(false);
-          onToggleChange(false);
-        }
+        console.error('Error checking voice password:', error);
+        setEnabled(false);
+        setHasExistingPassword(false);
+        onToggleChange(false);
       } finally {
-        if (isMounted) {
-          setIsInitializing(false);
-        }
+        setIsProcessing(false);
       }
     };
 
-    initializeComponent();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-      
-      if (event === 'SIGNED_IN' && session?.user) {
-        await checkExistingVoicePassword();
-      } else if (event === 'SIGNED_OUT') {
-        setEnabled(false);
-        setHasExistingPassword(false);
-        setVoicePassword('');
-        onToggleChange(false);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      subscription?.unsubscribe();
-    };
-  }, []);
-
-  const checkExistingVoicePassword = async () => {
-    try {
-      setIsProcessing(true);
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        setEnabled(false);
-        setHasExistingPassword(false);
-        onToggleChange(false);
-        return;
-      }
-
-      const { data: voicePasswordData, error } = await supabase
-        .from('user_voice_passwords')
-        .select('password')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (voicePasswordData) {
-        setVoicePassword('');
-        setHasExistingPassword(true);
-        setEnabled(true);
-        onToggleChange(true);
-      } else {
-        setEnabled(false);
-        setHasExistingPassword(false);
-        onToggleChange(false);
-      }
-    } catch (error) {
-      console.error('Error checking voice password:', error);
-      setEnabled(false);
-      setHasExistingPassword(false);
-      onToggleChange(false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    checkExistingVoicePassword();
+  }, [enabled]);
 
   const handleToggleChange = async (checked: boolean) => {
     if (disabled || isProcessing) return;
     
+    // If turning off and there's an existing password, confirm removal
     if (!checked && hasExistingPassword) {
+      // You might want to add a confirmation dialog here
       await handleCancel();
-    } else {
-      setVoicePassword('');
-      setEnabled(checked);
-      onToggleChange(checked);
+      return;
     }
+    
+    // Otherwise, just update the state
+    setEnabled(checked);
+    onToggleChange(checked);
   };
 
   const handleSubmit = async () => {
@@ -182,9 +122,7 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
 
       showToastMessage('Voice password saved successfully', 'success');
       setVoicePassword('');
-      setEnabled(true);
       setHasExistingPassword(true);
-      onToggleChange(true);
     } catch (error) {
       console.error('Error saving voice password:', error);
       showToastMessage('Failed to save voice password', 'danger');
@@ -207,8 +145,8 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
       }
 
       setVoicePassword('');
-      setEnabled(false);
       setHasExistingPassword(false);
+      setEnabled(false);
       onToggleChange(false);
       showToastMessage('Voice password removed', 'success');
     } catch (error) {
@@ -224,10 +162,6 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
     setToastColor(color);
     setShowToast(true);
   };
-
-  if (isInitializing) {
-    return <IonSpinner name="crescent" />;
-  }
 
   return (
     <>
@@ -309,7 +243,11 @@ const VoicePasswordToggle: React.FC<VoicePasswordToggleProps> = ({
                   <IonButton
                     fill="outline"
                     color="danger"
-                    onClick={handleCancel}
+                    onClick={() => {
+                      setEnabled(false);
+                      onToggleChange(false);
+                      setVoicePassword('');
+                    }}
                     disabled={isProcessing || disabled}
                   >
                     Cancel
