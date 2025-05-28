@@ -200,7 +200,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       
       // Navigate after a brief delay
       setTimeout(() => {
-        router.push('/app/journals');
+        router.push('/#/app/journals');
       }, 1000);
       
     } catch (error) {
@@ -208,7 +208,7 @@ const OverViewcard: React.FC<OverViewcardProps> = ({
       setToastMessage('Failed to delete journal. Please try again.');
       setShowToast(true);
     } finally {
-      navigation.push('/app', 'forward', 'replace');
+      navigation.push('/#/app', 'forward', 'replace');
     }
   };
 

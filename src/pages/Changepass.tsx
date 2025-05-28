@@ -66,7 +66,7 @@ const ChangePass: React.FC = () => {
         } catch (error: any) {
             setAlertMessage("Invalid or expired reset link. Please request a new one.");
             setShowAlert(true);
-            window.location.href = 'https://cephaline-supabase.vercel.app';
+            window.location.href = 'https://cephaline-supabase.vercel.app/#/';
         } finally {
             setIsLoading(false);
         }
@@ -134,7 +134,7 @@ const ChangePass: React.FC = () => {
             setShowAlert(true);
 
             await supabase.auth.signOut();
-            window.location.href = 'https://cephaline-supabase.vercel.app';
+            window.location.href = 'https://cephaline-supabase.vercel.app/#/';
         } catch (error: any) {
             setAlertMessage(error.message || "Password update failed. Please try again.");
             setShowAlert(true);

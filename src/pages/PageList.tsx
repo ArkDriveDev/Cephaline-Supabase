@@ -76,12 +76,12 @@ const PageList: React.FC = () => {
         ) : (
           <IonList>
             <IonButtons slot="start">
-              <IonBackButton defaultHref={`/app/Overviewing/${journalId}`} />
+              <IonBackButton defaultHref={`/#/app/Overviewing/${journalId}`} />
             </IonButtons>
             {pages.map((page) => (
               <IonItem
                 key={page.page_id}
-                routerLink={`/app/JournalPageView/${journalId}/${page.page_id}`} // Updated to use JournalPageView
+                routerLink={`/#/app/JournalPageView/${journalId}/${page.page_id}`} // Updated to use JournalPageView
                 detail
               >
                 <IonLabel>

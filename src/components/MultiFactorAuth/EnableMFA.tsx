@@ -416,12 +416,6 @@ useEffect(() => {
               disabled={false}
             />
 
-            <FacialRecognitionToggle
-              initialEnabled={activeMFAMethod === 'facial'}
-              onToggleChange={handleFacialToggleChange}
-              disabled={false}
-            />
-
             <VoicePasswordToggle
               initialEnabled={activeMFAMethod === 'voice'}
               onToggleChange={handleVoiceToggleChange}

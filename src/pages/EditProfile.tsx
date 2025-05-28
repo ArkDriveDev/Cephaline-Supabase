@@ -297,7 +297,7 @@ const EditProfile: React.FC = () => {
       setShowAlert(true);
       setTimeout(() => {
         console.log('Navigating back to app...');
-        history.push('/app');
+        history.push('/#/app');
       }, 1500);
     } catch (error) {
       console.error('Update error:', error);

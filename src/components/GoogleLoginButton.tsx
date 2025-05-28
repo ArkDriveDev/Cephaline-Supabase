@@ -21,7 +21,7 @@ const GoogleLoginButton = () => {
             position: 'top',
             color: 'success'
           });
-          router.push('/app', 'root', 'replace');
+          router.push('/#/app', 'root', 'replace');
         }
       }
     );

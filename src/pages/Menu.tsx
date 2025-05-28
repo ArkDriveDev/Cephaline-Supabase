@@ -26,9 +26,10 @@ import { supabase } from '../utils/supaBaseClient';
 const Menu: React.FC = () => {
   const history = useHistory();
 
+  // Updated paths with hash prefix
   const path = [
-    { name: 'Home', url: '/app/home', icon: homeOutline },
-    { name: 'Profile', url: '/app/editProfile', icon: personCircleOutline },
+    { name: 'Home', url: '/#/app/home', icon: homeOutline },
+    { name: 'Profile', url: '/#/app/editProfile', icon: personCircleOutline },
   ]
 
   const glow = {
@@ -58,7 +59,7 @@ const Menu: React.FC = () => {
       if (error) throw error;
       
       // Redirect to login page after successful logout
-      history.push('/');
+      history.push('/#/');
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -75,7 +76,7 @@ const Menu: React.FC = () => {
         <IonContent className="ion-padding">
           {path.map((item, index) => (
             <IonMenuToggle key={index}>
-              <IonItem style={h2Style} routerLink={item.url} routerDirection="forward">
+              <IonItem style={h2Style} routerLink={item.url.replace('/#', '')} routerDirection="forward">
                 <IonIcon style={h1Style} icon={item.icon} slot="start"></IonIcon>
                 {item.name}
               </IonItem>
@@ -106,6 +107,7 @@ const Menu: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonRouterOutlet id="main">
+          {/* Removed hash from Route paths since they're handled internally */}
           <Route exact path="/app/home" component={Home} />
           <Route exact path="/app/editProfile" component={EditProfile} />
           <Route exact path="/app/JournalPage/:journalId?" component={JournalPage} />

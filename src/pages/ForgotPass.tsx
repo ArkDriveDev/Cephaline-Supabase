@@ -159,7 +159,7 @@ const ForgotPass: React.FC = () => {
                     </div>
 
                     <IonButton
-                        routerLink="/"
+                        routerLink="/#/"
                         fill="clear"
                         style={{
                             color: '#000000',
