@@ -313,7 +313,7 @@ const ChangePass: React.FC = () => {
                     </div>
 
                     <IonButton
-                        routerLink="/Cephaline-Supabase"
+                        routerLink="/"
                         fill="clear"
                         style={{
                             color: '#3880ff',
